@@ -1,13 +1,13 @@
 import { formatUnits, zeroAddress } from 'viem';
-import { RevertedError } from '../chain/errors.js';
-import { decodeOracle } from '../chain/oracleDecoder.js';
-import { readMarket } from '../chain/marketReader.js';
-import { readToken, readVault } from '../chain/vaultReader.js';
-import type { Address, ChainReader, DecodedOracle, FrozenFor, Hex, MarketInfo, ReasonCode } from '../types.js';
-import { deriveAssumption, type Assumption } from './assumptions.js';
-import { breakpoints } from './breakpoints.js';
-import { frozenFor } from './frozenFor.js';
-import type { Registry } from './registry.js';
+import { RevertedError } from './chain/errors.js';
+import { decodeOracle } from './chain/oracleDecoder.js';
+import { readMarket } from './chain/marketReader.js';
+import { readToken, readVault } from './chain/vaultReader.js';
+import type { Address, ChainReader, DecodedOracle, FrozenFor, Hex, MarketInfo, ReasonCode } from './types.js';
+import { deriveAssumption, type Assumption } from './analysis/assumptions.js';
+import { breakpoints } from './analysis/breakpoints.js';
+import { frozenFor } from './analysis/frozenFor.js';
+import type { Registry } from './analysis/registry.js';
 
 type Breakpoints = ReturnType<typeof breakpoints>;
 export type FrozenForView = FrozenFor & { human: string };
@@ -60,7 +60,7 @@ export function describeFrozenFor(f: FrozenFor): FrozenForView {
   }
 }
 
-interface Analyzed { market: ReportMarket; assets: bigint; oracleClass: Exposure['oracleClass']; frozen: FrozenFor; lltv: bigint }
+interface Analyzed { market: ReportMarket; assets: bigint; oracleClass: Exposure['oracleClass']; frozen: FrozenFor }
 
 // One market of the vault with everything the report and the snapshots need.
 export interface AnalyzedMarket { market: MarketInfo; assets: bigint; oracle: DecodedOracle; assumption: Assumption }
@@ -134,7 +134,6 @@ export async function analyzeVault(
         assets: p.assets,
         oracleClass: oracle.class,
         frozen: frozenFor(oracle, registry, header.timestamp),
-        lltv: m.lltv,
       });
       exposuresById.set(d.id, entry);
     }

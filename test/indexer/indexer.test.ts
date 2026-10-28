@@ -63,7 +63,7 @@ describe('indexRange', () => {
     c.logsList = [log(VAULT, 300)];
     const { deps: d, snapshots, markets } = deps(c);
     await indexRange(d, VAULT, 200n, 600n);
-    expect(markets.get(id(1))).toMatchObject({ assumptionId: 'usde:usd', assumption: 'USDe = 1 USD', oracleClass: 'fixed', lltv: LLTV_915 });
+    expect(markets.get(id(1))).toEqual({ id: id(1), assumptionId: 'usde:usd', assumption: 'USDe = 1 USD' });
     expect(snapshots[0]).toMatchObject({ block: 300n, totalAssets: 1_000_000n, positions: [{ marketId: id(1), assets: 700_000n }] });
   });
 

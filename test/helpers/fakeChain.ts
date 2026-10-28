@@ -1,6 +1,7 @@
 import { encodeFunctionData, encodeFunctionResult, type Abi } from 'viem';
 import { BlockNotFoundError } from '../../src/chain/errors.js';
 import type { Address, ChainReader, Hex } from '../../src/types.js';
+import fixture from '../fixtures/oracles.json' with { type: 'json' };
 
 // Tiny contract simulator: register what `fn(args)` returns on an address; everything else reverts (null).
 export class FakeChain implements ChainReader {
@@ -45,3 +46,6 @@ export class FakeChain implements ChainReader {
     return this.logsList.filter((l) => wanted.has(l.address.toLowerCase()) && l.blockNumber >= p.from && l.blockNumber <= p.to);
   }
 }
+
+/** A chain that answers with the real eth_call results recorded on Base (test/fixtures/oracles.json). */
+export const recordedOracles = () => new FakeChain().load(fixture.calls as Record<string, string | null>);

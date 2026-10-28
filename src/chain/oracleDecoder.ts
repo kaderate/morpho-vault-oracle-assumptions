@@ -49,7 +49,7 @@ async function decodeChainlink(
     if (quote.some(set)) return unknown(address, 'ORACLE_UNSUPPORTED', 'fixed base price combined with a quote-side feed or vault');
     return { class: 'fixed', address };
   }
-  return { class: 'chainlink', address, feeds, ...(set(baseVault) ? { baseVault } : {}) };
+  return { class: 'chainlink', address, feeds }; // feeds is empty when only an ERC4626 base vault prices it
 }
 
 async function decodeMeta(
@@ -59,20 +59,14 @@ async function decodeMeta(
   get: <T>(fn: string) => Promise<T | null>,
   block?: bigint,
 ): Promise<DecodedOracle> {
-  const [backupAddress, threshold, challenge, healing, deviation, challenged, backup, healingNow] = await Promise.all([
+  const [backupAddress, challenge, challenged, backup, healingNow] = await Promise.all([
     get<Address>('backupOracle'),
-    get<bigint>('deviationThreshold'),
     get<bigint>('challengeTimelockDuration'),
-    get<bigint>('healingTimelockDuration'),
-    get<bigint>('getDeviation'),
     get<boolean>('isChallenged'),
     get<boolean>('isBackup'),
     get<boolean>('isHealing'),
   ]);
-  if (
-    backupAddress === null || threshold === null || challenge === null || healing === null ||
-    deviation === null || challenged === null || backup === null || healingNow === null
-  ) {
+  if (backupAddress === null || challenge === null || challenged === null || backup === null || healingNow === null) {
     return unknown(address, 'ORACLE_REVERTED', 'a MetaOracle getter reverted');
   }
   const [primary, backupOracle] = await Promise.all([
@@ -86,19 +80,12 @@ async function decodeMeta(
     address,
     primary,
     backup: backupOracle,
-    deviationThreshold: threshold,
-    deviation,
     challengeSeconds: Number(challenge),
-    healingSeconds: Number(healing),
     state,
   };
   if (state === 'challenged') {
     const at = await get<bigint>('challengeExpiresAt');
     if (at !== null && at > 0n) meta.challengeExpiresAt = Number(at);
-  }
-  if (state === 'healing') {
-    const at = await get<bigint>('healingExpiresAt');
-    if (at !== null && at > 0n) meta.healingExpiresAt = Number(at);
   }
   return meta;
 }

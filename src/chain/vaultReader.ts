@@ -27,16 +27,11 @@ export async function readToken(reader: ChainReader, token: Address, block?: big
   return { symbol: symbol ?? token, decimals };
 }
 
-// Name and asset only: enough for the vault list, without reading any position.
-export async function readVaultMeta(reader: ChainReader, vault: Address, block?: bigint): Promise<Pick<VaultState, 'name' | 'asset'>> {
-  const assetAddress = await need<Address>(reader, vault, vaultV2Abi, 'asset', [], block);
-  const name = await need<string>(reader, vault, vaultV2Abi, 'name', [], block);
-  return { name, asset: { address: assetAddress, ...(await readToken(reader, assetAddress, block)) } };
-}
-
 export async function readVault(reader: ChainReader, vault: Address, block?: bigint): Promise<VaultState> {
   const totalAssets = await need<bigint>(reader, vault, vaultV2Abi, 'totalAssets', [], block);
-  const { name, asset } = await readVaultMeta(reader, vault, block);
+  const assetAddress = await need<Address>(reader, vault, vaultV2Abi, 'asset', [], block);
+  const name = await need<string>(reader, vault, vaultV2Abi, 'name', [], block);
+  const asset = { address: assetAddress, ...(await readToken(reader, assetAddress, block)) };
   const count = Number(await need<bigint>(reader, vault, vaultV2Abi, 'adaptersLength', [], block));
 
   const byMarket = new Map<`0x${string}`, bigint>();

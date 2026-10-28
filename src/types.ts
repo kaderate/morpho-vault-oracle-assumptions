@@ -12,18 +12,14 @@ export type ReasonCode =
   | 'TOKEN_UNREADABLE';
 export type DecodedOracle =
   | { class: 'fixed'; address: Address }
-  | { class: 'chainlink'; address: Address; feeds: Address[]; baseVault?: Address }
+  | { class: 'chainlink'; address: Address; feeds: Address[] }
   | {
       class: 'metaoracle';
       address: Address;
       primary: DecodedOracle;
       backup: DecodedOracle;
-      deviationThreshold: bigint /* 1e18 */;
-      deviation: bigint /* 1e18, getDeviation() */;
       challengeSeconds: number;
-      healingSeconds: number;
       challengeExpiresAt?: number;
-      healingExpiresAt?: number /* unix s, absent when 0 */;
       state: 'primary' | 'challenged' | 'backup' | 'healing';
     }
   | { class: 'unknown'; address: Address; reasonCode: ReasonCode; reason: string };

@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { getAddress, isAddress } from 'viem';
-import { buildReport } from '../analysis/report.js';
+import { buildReport } from '../report.js';
 import type { Registry } from '../analysis/registry.js';
 import { BlockNotFoundError, RevertedError, RpcUnavailableError } from '../chain/errors.js';
 import type { Repo } from '../db/repo.js';
@@ -10,9 +10,8 @@ export interface ServerDeps {
   reader: ChainReader;
   registry: Registry;
   vaults: Address[];
-  repo?: Repo;
+  repo: Repo;
   logger?: boolean;
-  now?: () => Date; // tests
 }
 
 export class ApiError extends Error {
@@ -23,7 +22,6 @@ export class ApiError extends Error {
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { reader, registry, repo } = deps;
-  const now = deps.now ?? (() => new Date());
   const tracked = new Set(deps.vaults.map((v) => getAddress(v)));
   const app = Fastify({ logger: deps.logger ?? false });
 
@@ -39,6 +37,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     req.log.error({ err }, 'unhandled error');
     return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: 'internal error' } });
   });
+
   app.setNotFoundHandler((_req, reply) => reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'no such route' } }));
 
   function trackedVault(raw: string): Address {
@@ -73,10 +72,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     const days = raw === undefined ? 30 : Number(raw);
     if (days > 365) throw new ApiError(400, 'INVALID_PARAMETER', `days must be an integer between 1 and 365, got "${raw}"`);
-    if (!repo) throw new ApiError(501, 'NOT_IMPLEMENTED', 'peaks need the database, which this instance runs without');
     // Database only: "current" is the latest stored snapshot, and block/asOf say which one. While the first
     // backfill is running that snapshot is old, and the response shows it.
-    const [r, latest] = await Promise.all([repo.peaks(vault, days, now()), repo.latestSnapshot(vault)]);
+    const [r, latest] = await Promise.all([repo.peaks(vault, days), repo.latestSnapshot(vault)]);
     return {
       vault,
       block: latest ? Number(latest.block) : null,

@@ -3,8 +3,7 @@ import { deriveAssumption } from '../../src/analysis/assumptions.js';
 import { loadRegistry } from '../../src/analysis/registry.js';
 import { decodeOracle } from '../../src/chain/oracleDecoder.js';
 import type { Address, DecodedOracle } from '../../src/types.js';
-import fixture from '../fixtures/oracles.json' with { type: 'json' };
-import { fakeReader } from '../helpers/fakeReader.js';
+import { recordedOracles } from '../helpers/fakeChain.js';
 
 const registry = loadRegistry('registry');
 const T = {
@@ -24,7 +23,7 @@ const chainlink = (...feeds: Address[]): DecodedOracle => ({ class: 'chainlink',
 describe('deriveAssumption', () => {
   let cbbtcOracle: DecodedOracle, usdeOracle: DecodedOracle;
   beforeAll(async () => {
-    const reader = fakeReader(fixture);
+    const reader = recordedOracles();
     cbbtcOracle = await decodeOracle(reader, '0x663BECd10daE6C4A3Dcd89F1d76c1174199639B9');
     usdeOracle = await decodeOracle(reader, '0xF4b17C79492d68775e22e8Dd0a2Bb22854A39A47');
   });

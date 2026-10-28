@@ -1,12 +1,8 @@
--- Markets are immutable on Morpho Blue: one row per market, written once.
+-- One row per market the vaults hold: which assumption its oracle rests on (NULL when `none` or `unknown`).
 CREATE TABLE markets (
   id            TEXT PRIMARY KEY,
-  collateral    TEXT NOT NULL,
-  oracle        TEXT NOT NULL,
-  lltv          NUMERIC(40, 0) NOT NULL,
-  assumption_id TEXT,            -- NULL when the market is `none` or `unknown`
-  assumption    TEXT,
-  oracle_class  TEXT NOT NULL
+  assumption_id TEXT,
+  assumption    TEXT
 );
 
 -- One row per (vault, block) where an allocation event happened. block_hash lets the indexer detect a reorg.
@@ -25,7 +21,6 @@ CREATE TABLE snapshot_positions (
   snapshot_id BIGINT NOT NULL REFERENCES snapshots (id) ON DELETE CASCADE,
   market_id   TEXT NOT NULL REFERENCES markets (id),
   assets      NUMERIC(78, 0) NOT NULL,
-  meta_state  JSONB,             -- MetaOracle state at this block, when the market has one
   PRIMARY KEY (snapshot_id, market_id)
 );
 

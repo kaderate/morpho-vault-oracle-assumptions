@@ -7,7 +7,7 @@ import type { Address, Hex } from '../../src/types.js';
 const URL = process.env.DATABASE_URL;
 const VAULT: Address = '0x00000000000000000000000000000000000000a1';
 const hash = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex;
-const mid = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex;
+const mid = hash; // market ids and block hashes are both 32-byte hex
 const NOW = new Date('2026-10-28T12:00:00Z');
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
 const BIG = 463_354_112_123_456_789_012n; // far above 2^53
@@ -30,8 +30,8 @@ describe.skipIf(!URL)('repo (Postgres)', () => {
   });
   beforeEach(async () => {
     await pool.query('TRUNCATE snapshot_positions, snapshots, markets, checkpoints CASCADE');
-    await repo.upsertMarket({ id: mid(1), collateral: '0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34', oracle: '0x0000000000000000000000000000000000000f01', lltv: 915000000000000000n, assumptionId: 'usde:usd', assumption: 'USDe = 1 USD', oracleClass: 'metaoracle' });
-    await repo.upsertMarket({ id: mid(2), collateral: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', oracle: '0x0000000000000000000000000000000000000f02', lltv: 860000000000000000n, assumptionId: 'cbbtc:btc', assumption: 'cbBTC = BTC', oracleClass: 'chainlink' });
+    await repo.upsertMarket({ id: mid(1), assumptionId: 'usde:usd', assumption: 'USDe = 1 USD' });
+    await repo.upsertMarket({ id: mid(2), assumptionId: 'cbbtc:btc', assumption: 'cbBTC = BTC' });
   });
 
   const snap = (block: number, ts: Date, usde: bigint, btc: bigint, total = 1000n) => ({
@@ -90,9 +90,14 @@ describe.skipIf(!URL)('repo (Postgres)', () => {
 
   it('amounts above 2^53 round-trip exactly', async () => {
     await repo.insertSnapshot(snap(10, hoursAgo(1), BIG, 1n, BIG + 1n));
-    const s = await repo.latestSnapshot(VAULT);
-    expect(s).toMatchObject({ block: 10n, blockHash: hash(10), totalAssets: BIG + 1n });
-    expect(s!.positions.find((p) => p.marketId === mid(1))!.assets).toBe(BIG);
+    const { rows } = await pool.query('SELECT s.total_assets, p.assets FROM snapshots s JOIN snapshot_positions p ON p.snapshot_id = s.id WHERE p.market_id = $1', [mid(1)]);
+    expect([BigInt(rows[0].total_assets), BigInt(rows[0].assets)]).toEqual([BIG + 1n, BIG]);
+  });
+
+  it('latestSnapshot returns the newest block and its time', async () => {
+    await repo.insertSnapshot(snap(10, hoursAgo(5), 1n, 1n));
+    await repo.insertSnapshot(snap(20, hoursAgo(1), 1n, 1n));
+    expect(await repo.latestSnapshot(VAULT)).toEqual({ block: 20n, ts: hoursAgo(1) });
   });
 
   it('checkpoint: none, then set, then overwritten', async () => {

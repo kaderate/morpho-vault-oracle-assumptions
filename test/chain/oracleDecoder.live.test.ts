@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { decodeOracle } from '../../src/chain/oracleDecoder.js';
-import { liveReader } from '../helpers/liveReader.js';
+import { createViemReader } from '../../src/chain/reader.js';
 
 describe.skipIf(!process.env.RPC_URL)('decodeOracle on Base', () => {
-  const reader = () => liveReader(process.env.RPC_URL as string);
+  const reader = () => createViemReader(process.env.RPC_URL as string);
 
   it('USDe/USDC oracle is a MetaOracle with a fixed primary and a chainlink backup', async () => {
     const o = await decodeOracle(reader(), '0xF4b17C79492d68775e22e8Dd0a2Bb22854A39A47');

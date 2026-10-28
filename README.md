@@ -8,25 +8,9 @@ Example, read on-chain on the demo vault (Steakhouse High Yield USDC, 2026-10-28
 
 ## Architecture
 
-```
- RPC (Base) ──► Indexer ──────► Postgres ◄──── API (Fastify)
-   (viem)      allocation       snapshots       /vaults/:a/report
-      │        events →         markets         /vaults/:a/peak
-      │        snapshot at      checkpoints
-      │        that block
-      └──► Chain readers ──► Oracle decoder ──► Analysis (pure)
-           vault V2 → adapter   fixed | chainlink |   assumptions, breakpoints,
-           → V1 vault → markets metaoracle | unknown  frozen-for
-```
+An indexer turns the vault's allocation events into snapshots in Postgres; chain readers and a pure analysis turn a vault at any block into a report. Diagram, components and failure paths: [ARCHITECTURE.md](ARCHITECTURE.md). What a feed or token *means* is decided by the registry in [registry/](registry/README.md); anything missing is `unknown`, never a guess.
 
-- **Chain readers** (`src/chain`): at any block, vault → adapters (`MorphoMarketV1`, or `MorphoVaultV1Adapter` followed one level into its V1 vault) → markets → oracles. One pinned block per read, Multicall3 batching, 3 requests in flight, retries with backoff.
-- **Oracle decoder**: `fixed`, `chainlink` (Morpho Chainlink oracle V2), `metaoracle` (Steakhouse MetaOracleDeviationTimelock), or `unknown` with a reason (revert, unsupported shape).
-- **Registry** (`registry/*.json`): what a feed or token *means*. Missing from the registry means `unknown`, never a guess. See [registry/README.md](registry/README.md).
-- **Analysis** (`src/analysis`, pure, no I/O): assumptions on the collateral side, the two breakpoints, frozen-for.
-- **Indexer** (`src/indexer`): `getLogs` for the vault's and its V1 vault's allocation events up to `head − CONFIRMATIONS`, one snapshot per (coalesced) event block, checkpoint with block hash, rollback on a hash mismatch.
-- **Postgres**: snapshots, positions, markets, checkpoints. Plain SQL migrations (`src/db/migrations`), run at startup.
-
-More detail and failure paths: [ARCHITECTURE.md](ARCHITECTURE.md).
+Where to start reading: `src/chain/oracleDecoder.ts` (oracle classes), `src/chain/vaultReader.ts` (vault to positions), `src/analysis/` (assumptions, frozen-for, breakpoints), `src/report.ts` (puts it together), `src/indexer/indexer.ts` (snapshots).
 
 Formulas: `drain = 1 − LLTV`, `badDebt = 1 − LLTV × LIF`, `LIF = min(1.15, 1 / (0.3 × LLTV + 0.7))`. At LLTV 91.5%: 8.5% and about 6.1%.
 

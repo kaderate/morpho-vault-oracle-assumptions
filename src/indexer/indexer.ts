@@ -1,4 +1,4 @@
-import { analyzeVault } from '../analysis/report.js';
+import { analyzeVault } from '../report.js';
 import type { Registry } from '../analysis/registry.js';
 import { resolveV1Vaults } from '../chain/vaultReader.js';
 import type { Repo } from '../db/repo.js';
@@ -27,18 +27,15 @@ const consoleLog: Logger = {
   error: (m, c) => console.error(m, c ?? ''),
 };
 
-// Reads the vault at `block` and stores the snapshot (positions and the markets they sit in).
+// Reads the vault at `block` and stores the snapshot: its positions, and the assumption each market rests on.
 async function snapshotAt(deps: IndexerDeps, vault: Address, block: bigint): Promise<void> {
   const a = await analyzeVault(deps, vault, block);
   for (const m of a.markets) {
+    const d = m.assumption;
     await deps.repo.upsertMarket({
       id: m.market.id,
-      collateral: m.market.collateral,
-      oracle: m.market.oracle,
-      lltv: m.market.lltv,
-      assumptionId: m.assumption.kind === 'assumption' ? m.assumption.id : null,
-      assumption: m.assumption.kind === 'assumption' ? m.assumption.text : null,
-      oracleClass: m.oracle.class,
+      assumptionId: d.kind === 'assumption' ? d.id : null,
+      assumption: d.kind === 'assumption' ? d.text : null,
     });
   }
   await deps.repo.insertSnapshot({
@@ -47,13 +44,7 @@ async function snapshotAt(deps: IndexerDeps, vault: Address, block: bigint): Pro
     blockHash: a.header.hash,
     ts: new Date(a.header.timestamp * 1000),
     totalAssets: a.totalAssets,
-    positions: a.markets.map((m) => ({
-      marketId: m.market.id,
-      assets: m.assets,
-      ...(m.oracle.class === 'metaoracle'
-        ? { metaState: { state: m.oracle.state, deviation: m.oracle.deviation.toString(), challengeExpiresAt: m.oracle.challengeExpiresAt ?? null } }
-        : {}),
-    })),
+    positions: a.markets.map((m) => ({ marketId: m.market.id, assets: m.assets })),
   });
 }
 

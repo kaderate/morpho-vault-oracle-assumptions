@@ -67,3 +67,7 @@ export function v1Scenario(totalAssets: bigint): FakeChain {
   fixedOracle(c, oracleAddr(2));
   return c;
 }
+
+/** exposures + idle + noAssumption + unknown: must be 100 (±0.1) for any report. */
+export const totalPct = (r: { exposures: { sharePct: number }[]; idle: { sharePct: number }; noAssumption: { sharePct: number }; unknown: { sharePct: number } }) =>
+  r.exposures.reduce((s, e) => s + e.sharePct, 0) + r.idle.sharePct + r.noAssumption.sharePct + r.unknown.sharePct;

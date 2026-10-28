@@ -3,8 +3,7 @@ import { frozenFor } from '../../src/analysis/frozenFor.js';
 import { loadRegistry } from '../../src/analysis/registry.js';
 import { decodeOracle } from '../../src/chain/oracleDecoder.js';
 import type { Address, DecodedOracle } from '../../src/types.js';
-import fixture from '../fixtures/oracles.json' with { type: 'json' };
-import { fakeReader } from '../helpers/fakeReader.js';
+import { recordedOracles } from '../helpers/fakeChain.js';
 
 const registry = loadRegistry('registry');
 const O: Address = '0x0000000000000000000000000000000000000abc';
@@ -19,7 +18,7 @@ const MGLO: Address = '0x3732F1E48499922426F9Ddad37D79C98B1fBf29E';
 describe('frozenFor', () => {
   let usde: Extract<DecodedOracle, { class: 'metaoracle' }>;
   beforeAll(async () => {
-    const o = await decodeOracle(fakeReader(fixture), '0xF4b17C79492d68775e22e8Dd0a2Bb22854A39A47');
+    const o = await decodeOracle(recordedOracles(), '0xF4b17C79492d68775e22e8Dd0a2Bb22854A39A47');
     if (o.class !== 'metaoracle') throw new Error('fixture changed');
     usde = o;
   });

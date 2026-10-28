@@ -8,9 +8,9 @@ import { readToken, readVault } from '../src/chain/vaultReader.js';
 import { read } from '../src/chain/call.js';
 import { parseAbi } from 'viem';
 import type { Address, DecodedOracle } from '../src/types.js';
-import { liveReader } from '../test/helpers/liveReader.js';
+import { createViemReader } from '../src/chain/reader.js';
 
-const reader = liveReader(process.env.RPC_URL as string);
+const reader = createViemReader(process.env.RPC_URL as string);
 const feedAbi = parseAbi(['function description() view returns (string)', 'function decimals() view returns (uint8)']);
 const block = (await reader.blockNumber()) - 5n;
 const seen = new Set<string>();
@@ -25,7 +25,7 @@ async function describeOracle(o: DecodedOracle, indent: string): Promise<void> {
       const d = await read<string>(reader, f, feedAbi, 'description', [], block);
       console.log(`${indent}feed ${f} "${d ?? '?'}"`);
     }
-    if (o.baseVault) console.log(`${indent}baseVault ${o.baseVault}`);
+    if (o.feeds.length === 0) console.log(`${indent}no feed (ERC4626 base vault)`);
   } else console.log(`${indent}${o.class} ${o.address}${o.class === 'unknown' ? ' ' + o.reason : ''}`);
 }
 

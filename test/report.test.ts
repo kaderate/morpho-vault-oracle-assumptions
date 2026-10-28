@@ -1,10 +1,10 @@
 import { getAddress, zeroAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
-import { buildReport } from '../../src/analysis/report.js';
-import { loadRegistry } from '../../src/analysis/registry.js';
+import { buildReport } from '../src/report.js';
+import { loadRegistry } from '../src/analysis/registry.js';
 import {
-  BTC_USD, CBBTC, ETH_USD, feedOracle, fixedOracle, id, LLTV_86, LLTV_915, MGLO, MGLO_FEED, oracleAddr, scenario, USDE, VAULT, WETH,
-} from '../helpers/vaultScenario.js';
+  totalPct, BTC_USD, CBBTC, ETH_USD, feedOracle, fixedOracle, id, LLTV_86, LLTV_915, MGLO, MGLO_FEED, oracleAddr, scenario, USDE, VAULT, WETH,
+} from './helpers/vaultScenario.js';
 
 const registry = loadRegistry('registry');
 
@@ -18,7 +18,7 @@ describe('buildReport: failure paths', () => {
     expect(r.idle.sharePct).toBe(0);
     expect(r.unknown.sharePct).toBe(30);
     expect(r.unknown.adapters).toEqual([{ address: getAddress(WEIRD), reasonCode: 'UNKNOWN_ADAPTER' }]);
-    const sum = r.exposures.reduce((s, e) => s + e.sharePct, 0) + r.idle.sharePct + r.noAssumption.sharePct + r.unknown.sharePct;
+    const sum = totalPct(r);
     expect(sum).toBe(100);
   });
 
@@ -63,7 +63,7 @@ describe('buildReport', () => {
     expect(r.exposures[0]).toMatchObject({ assumptionId: 'usde:usd', sharePct: 70, frozenFor: { kind: 'unbounded' } });
     expect(r.idle.sharePct).toBe(10);
     expect(r.noAssumption).toMatchObject({ sharePct: 20, markets: [{ collateral: 'WETH', sharePct: 20 }] });
-    const sum = r.exposures.reduce((s, e) => s + e.sharePct, 0) + r.idle.sharePct + r.noAssumption.sharePct + r.unknown.sharePct;
+    const sum = totalPct(r);
     expect(Math.abs(sum - 100)).toBeLessThanOrEqual(0.1);
   });
 

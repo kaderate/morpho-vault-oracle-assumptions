@@ -10,15 +10,11 @@ export const oracleAbi = parseAbi([
   'function QUOTE_VAULT() view returns (address)',
   'function primaryOracle() view returns (address)',
   'function backupOracle() view returns (address)',
-  'function deviationThreshold() view returns (uint256)',
   'function challengeTimelockDuration() view returns (uint256)',
-  'function healingTimelockDuration() view returns (uint256)',
-  'function getDeviation() view returns (uint256)',
   'function isChallenged() view returns (bool)',
   'function isBackup() view returns (bool)',
   'function isHealing() view returns (bool)',
   'function challengeExpiresAt() view returns (uint256)',
-  'function healingExpiresAt() view returns (uint256)',
 ]);
 
 export const MORPHO = '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb' as const;

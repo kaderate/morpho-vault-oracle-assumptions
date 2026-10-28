@@ -5,11 +5,11 @@ import {
 import { RevertedError } from '../../src/chain/errors.js';
 import { readMarket } from '../../src/chain/marketReader.js';
 import { readToken, readVault } from '../../src/chain/vaultReader.js';
-import type { Address, Hex } from '../../src/types.js';
+import type { Address } from '../../src/types.js';
 import { FakeChain } from '../helpers/fakeChain.js';
+import { id } from '../helpers/vaultScenario.js';
 
 const a = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address;
-const id = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex;
 const VAULT = a(0x100), USDC = a(0x200), ADAPTER = a(0x300), V1 = a(0x400), V1_ADAPTER = a(0x500);
 
 function baseVault(chain: FakeChain, adapters: Address[], totalAssets: bigint) {

@@ -12,13 +12,13 @@ const V = getAddress(VAULT);
 const empty: PeakResult = { coverage: { from: null, snapshots: 0, windowComplete: false }, peaks: [] };
 
 // /peak reads the database only: the chain is never needed (the reader throws if it is touched).
-function server(peaks: PeakResult | ((vault: string, days: number) => PeakResult) | null, snapshot?: { block: bigint; ts: Date }) {
+function server(peaks: PeakResult | ((vault: string, days: number) => PeakResult), snapshot?: { block: bigint; ts: Date }) {
   const reader = scenario(1n, []);
   reader.latest = async () => { throw new RpcUnavailableError('the chain must not be used by /peak'); };
   const { repo } = createMemoryRepo();
   if (snapshot) void repo.insertSnapshot({ vault: V, block: snapshot.block, blockHash: `0x${'1'.repeat(64)}`, ts: snapshot.ts, totalAssets: 1n, positions: [] });
-  const stub = peaks === null ? undefined : { ...repo, peaks: async (v: string, d: number) => (typeof peaks === 'function' ? peaks(v, d) : peaks) };
-  return buildServer({ reader, registry, vaults: [V], ...(stub ? { repo: stub as never } : {}) });
+  const stub = { ...repo, peaks: async (v: string, d: number) => (typeof peaks === 'function' ? peaks(v, d) : peaks) };
+  return buildServer({ reader, registry, vaults: [V], repo: stub });
 }
 
 describe('GET /vaults/:address/peak', () => {
@@ -51,15 +51,11 @@ describe('GET /vaults/:address/peak', () => {
   });
 
   it('works while the RPC is down, and says null/empty when nothing is stored yet', async () => {
-    const res = await server(empty).inject(`/vaults/${V}/peak?days=7`);
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ block: null, asOf: null, windowDays: 7, coverage: { from: null, snapshots: 0 }, peaks: [] });
-  });
-
-  it('passes ?days= to the query', async () => {
     let days = 0;
-    await server((_v, d) => { days = d; return empty; }).inject(`/vaults/${V}/peak?days=7`);
+    const res = await server((_v, d) => { days = d; return empty; }).inject(`/vaults/${V}/peak?days=7`);
+    expect(res.statusCode).toBe(200);
     expect(days).toBe(7);
+    expect(res.json()).toMatchObject({ block: null, asOf: null, windowDays: 7, coverage: { from: null, snapshots: 0 }, peaks: [] });
   });
 
   it('400 INVALID_PARAMETER for a bad days value', async () => {
@@ -75,10 +71,5 @@ describe('GET /vaults/:address/peak', () => {
     const app = server(() => { throw new Error('not reached'); });
     expect((await app.inject('/vaults/0x000000000000000000000000000000000000dEaD/peak')).json().error.code).toBe('VAULT_NOT_TRACKED');
     expect((await app.inject('/vaults/zzz/peak')).json().error.code).toBe('INVALID_ADDRESS');
-  });
-
-  it('501 NOT_IMPLEMENTED when the service runs without a database', async () => {
-    const res = await server(null).inject(`/vaults/${V}/peak`);
-    expect(res.statusCode).toBe(501);
   });
 });

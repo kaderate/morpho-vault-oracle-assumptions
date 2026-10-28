@@ -12,7 +12,8 @@ export function createMemoryRepo() {
       if (!snapshots.some((x) => x.vault === s.vault && x.block === s.block)) snapshots.push(s);
     },
     async latestSnapshot(vault) {
-      return snapshots.filter((s) => s.vault === vault).sort((a, b) => (a.block > b.block ? -1 : 1))[0] ?? null;
+      const s = snapshots.filter((x) => x.vault === vault).sort((a, b) => (a.block > b.block ? -1 : 1))[0];
+      return s ? { block: s.block, ts: s.ts } : null;
     },
     async getCheckpoint(vault) { return checkpoints.get(vault) ?? null; },
     async setCheckpoint(vault, block, hash) { checkpoints.set(vault, { block, hash }); },

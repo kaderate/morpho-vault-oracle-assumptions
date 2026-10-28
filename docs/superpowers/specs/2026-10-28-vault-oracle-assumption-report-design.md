@@ -75,11 +75,11 @@ Peak share per assumption across stored snapshots in the window.
 - Cost control: coalesce events so a vault gets at most one snapshot per time window (about 10 min) and per block. That vault had ~425 user events in ~4.6 days.
 - Loop: `getLogs` in chunks up to `head − CONFIRMATIONS`; for each distinct block with an event, read the vault state at that block and write `snapshots` and `snapshot_positions`; then advance the checkpoint, all in one transaction.
 - Backfill: if no checkpoint, start at `head − BACKFILL_DAYS` (default 7; 30 for the demo). A first snapshot is taken at the start block.
-- MetaOracle state is read at each snapshot block. State changes with no vault event in between are not captured: documented limit.
+- The MetaOracle state is read live by `/report`; it is not stored in snapshots (see "With more time" in `BusinessCase.md`).
 
 ## Schema (sketch)
 
-`vaults(address pk, name, v1_address)` · `checkpoints(vault pk, last_block, last_hash)` · `markets(id pk, loan, collateral, oracle, lltv, decoded jsonb, class, assumption)` · `snapshots(id pk, vault, block, ts, total_assets, unique(vault, block))` · `snapshot_positions(snapshot_id, market_id, assets, meta_state jsonb)` · `events(tx_hash, log_index, vault, block, kind, unique(tx_hash, log_index))`.
+`checkpoints(vault pk, last_block, last_hash)` · `markets(id pk, assumption_id, assumption)` · `snapshots(id pk, vault, block, block_hash, ts, total_assets, unique(vault, block))` · `snapshot_positions(snapshot_id, market_id, assets)`. Idempotency comes from `unique(vault, block)`; there is no `vaults` or `events` table.
 
 ## Time budget (4h target: 3h40 of work, 20 min buffer)
 

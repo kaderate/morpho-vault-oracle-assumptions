@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { loadRegistry } from '../../src/analysis/registry.js';
 import { buildServer } from '../../src/api/server.js';
+import { createMemoryRepo } from '../helpers/memoryRepo.js';
 import { fixedOracle, LLTV_915, oracleAddr, scenario, USDE, VAULT } from '../helpers/vaultScenario.js';
 import { getAddress } from 'viem';
 import { RpcUnavailableError } from '../../src/chain/errors.js';
 
 const registry = loadRegistry('registry');
+const { repo } = createMemoryRepo(); // /report does not touch the database
 const server = () => {
   const chain = scenario(1_000_000n, [{ n: 1, collateral: USDE, oracle: oracleAddr(2), lltv: LLTV_915, assets: 760_000n }]);
   fixedOracle(chain, oracleAddr(2));
-  return buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] });
+  return buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)], repo });
 };
 
 describe('GET /vaults/:address/report', () => {
@@ -57,7 +59,7 @@ describe('GET /vaults/:address/report', () => {
   it('500 INTERNAL_ERROR with the error shape when the chain read fails', async () => {
     const chain = scenario(1_000_000n, []);
     chain.call = async () => { throw new Error('rpc down'); };
-    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report`);
+    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)], repo }).inject(`/vaults/${VAULT}/report`);
     expect(res.statusCode).toBe(500);
     expect(res.json().error.code).toBe('INTERNAL_ERROR');
   });
@@ -65,7 +67,7 @@ describe('GET /vaults/:address/report', () => {
   it('RPC down: 503 RPC_UNAVAILABLE', async () => {
     const chain = scenario(1_000_000n, []);
     chain.latest = async () => { throw new RpcUnavailableError('down'); };
-    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report`);
+    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)], repo }).inject(`/vaults/${VAULT}/report`);
     expect(res.statusCode).toBe(503);
     expect(res.json().error.code).toBe('RPC_UNAVAILABLE');
   });
@@ -80,8 +82,14 @@ describe('GET /vaults/:address/report', () => {
     const chain = scenario(1_000_000n, []);
     const real = chain.call.bind(chain);
     chain.call = async (to, data, block) => (block === 5n ? null : real(to, data, block));
-    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report?block=5`);
+    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)], repo }).inject(`/vaults/${VAULT}/report?block=5`);
     expect(res.statusCode).toBe(404);
     expect(res.json().error).toMatchObject({ code: 'BLOCK_NOT_AVAILABLE', message: expect.stringContaining('5') });
+  });
+
+  it('an unknown route answers 404 in the same error shape', async () => {
+    const res = await server().inject('/nope');
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'no such route' } });
   });
 });

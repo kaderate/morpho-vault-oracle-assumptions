@@ -3,12 +3,8 @@ import type { Address, Hex } from '../types.js';
 
 export interface MarketRow {
   id: Hex;
-  collateral: Address;
-  oracle: Address;
-  lltv: bigint;
   assumptionId: string | null;
   assumption: string | null;
-  oracleClass: string;
 }
 export interface SnapshotInput {
   vault: Address;
@@ -16,9 +12,8 @@ export interface SnapshotInput {
   blockHash: Hex;
   ts: Date;
   totalAssets: bigint;
-  positions: { marketId: Hex; assets: bigint; metaState?: unknown }[];
+  positions: { marketId: Hex; assets: bigint }[];
 }
-export type StoredSnapshot = SnapshotInput;
 export interface PeakResult {
   coverage: { from: Date | null; snapshots: number; windowComplete: boolean };
   peaks: { assumptionId: string; assumption: string; currentSharePct: number; peakSharePct: number; peakBlock: bigint; peakAt: Date }[];
@@ -27,7 +22,7 @@ export interface PeakResult {
 export interface Repo {
   upsertMarket(m: MarketRow): Promise<void>;
   insertSnapshot(s: SnapshotInput): Promise<void>;
-  latestSnapshot(vault: Address): Promise<StoredSnapshot | null>;
+  latestSnapshot(vault: Address): Promise<{ block: bigint; ts: Date } | null>;
   getCheckpoint(vault: Address): Promise<{ block: bigint; hash: Hex } | null>;
   setCheckpoint(vault: Address, block: bigint, hash: Hex): Promise<void>;
   snapshotHashes(vault: Address, limit: number): Promise<{ block: bigint; blockHash: Hex }[]>;
@@ -39,12 +34,11 @@ export interface Repo {
 export function createRepo(pool: pg.Pool): Repo {
   return {
     async upsertMarket(m) {
-      // Markets are immutable: a second write of the same id changes nothing.
+      // The assumption comes from the registry, which can change: the latest derivation wins.
       await pool.query(
-        `INSERT INTO markets (id, collateral, oracle, lltv, assumption_id, assumption, oracle_class)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (id) DO UPDATE SET assumption_id = EXCLUDED.assumption_id, assumption = EXCLUDED.assumption, oracle_class = EXCLUDED.oracle_class`,
-        [m.id, m.collateral, m.oracle, m.lltv.toString(), m.assumptionId, m.assumption, m.oracleClass],
+        `INSERT INTO markets (id, assumption_id, assumption) VALUES ($1, $2, $3)
+         ON CONFLICT (id) DO UPDATE SET assumption_id = EXCLUDED.assumption_id, assumption = EXCLUDED.assumption`,
+        [m.id, m.assumptionId, m.assumption],
       );
     },
 
@@ -61,8 +55,8 @@ export function createRepo(pool: pg.Pool): Repo {
         if (id !== undefined) {
           for (const p of s.positions) {
             await client.query(
-              'INSERT INTO snapshot_positions (snapshot_id, market_id, assets, meta_state) VALUES ($1, $2, $3, $4)',
-              [id, p.marketId, p.assets.toString(), p.metaState === undefined ? null : JSON.stringify(p.metaState)],
+              'INSERT INTO snapshot_positions (snapshot_id, market_id, assets) VALUES ($1, $2, $3)',
+              [id, p.marketId, p.assets.toString()],
             );
           }
         }
@@ -76,21 +70,8 @@ export function createRepo(pool: pg.Pool): Repo {
     },
 
     async latestSnapshot(vault) {
-      const { rows } = await pool.query(
-        'SELECT id, block, block_hash, ts, total_assets FROM snapshots WHERE vault = $1 ORDER BY block DESC LIMIT 1',
-        [vault],
-      );
-      const r = rows[0];
-      if (!r) return null;
-      const pos = await pool.query('SELECT market_id, assets, meta_state FROM snapshot_positions WHERE snapshot_id = $1', [r.id]);
-      return {
-        vault,
-        block: BigInt(r.block),
-        blockHash: r.block_hash,
-        ts: r.ts,
-        totalAssets: BigInt(r.total_assets),
-        positions: pos.rows.map((p) => ({ marketId: p.market_id, assets: BigInt(p.assets), ...(p.meta_state ? { metaState: p.meta_state } : {}) })),
-      };
+      const { rows } = await pool.query('SELECT block, ts FROM snapshots WHERE vault = $1 ORDER BY block DESC LIMIT 1', [vault]);
+      return rows[0] ? { block: BigInt(rows[0].block), ts: rows[0].ts } : null;
     },
 
     async getCheckpoint(vault) {
