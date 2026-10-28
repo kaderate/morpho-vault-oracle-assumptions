@@ -17,10 +17,10 @@ A backend that answers one question for a Morpho vault on Base: **"which bets do
 
 It reads the chain over an RPC, follows the vault's adapters to its markets, decodes each oracle, and returns:
 
-1. **Exposure per assumption**, e.g. "39% of this vault bets USDe = $1".
+1. **Exposure per assumption**, e.g. "76% of this vault bets USDe = $1".
 2. **Two breakpoints per market**: the price drop that drains liquidity (1 − LLTV) and the smaller one that creates bad debt (~1 − LLTV × LIF).
 3. **How long the oracle can stay frozen**, when it can be computed.
-4. **30-day peak exposure**, since allocations can shift instantly.
+4. **Peak exposure** over the indexed window (up to 30 days), since allocations can shift instantly.
 
 No score, only facts. The reader decides.
 
@@ -35,7 +35,8 @@ Morpho leaves oracle choice to curators, and the incidents above were amplified 
 | Existing | Gap |
 |---|---|
 | Credora (RedStone) vault ratings | Oracle modifier is qualitative, not quantified publicly |
-| Morpho app warnings, Oracle Portal | Fire only once the price is 10x off; no vault view |
+| Morpho app warnings | Fire only once the price is 10x off |
+| Morpho Oracle Portal | Decodes one oracle at a time, for deployers; no vault view |
 | Sigma Labs RFC (unfunded) | Badges in a registry, 6 months out |
 | Chaos Labs, Gauntlet, Hypernative | Built for curators, compare oracle with market price |
 
@@ -45,10 +46,11 @@ Mine is vault-level, computed from the chain, and reproducible at a given block.
 
 - Base only. V2 vaults from a list, plus one V1 level behind an adapter. No UI, no price forecast.
 - Only assumptions on the collateral side are reported, since they are the lender's risk.
-- Feed meaning comes from a versioned registry in the repo. Unknown feeds are labeled *unknown*, never guessed.
+- Feed meaning comes from a versioned registry in the repo, filled by hand. Unknown feeds are labeled *unknown*, never guessed: on the demo vault, ~20% is unknown (a custom mGLO feed).
+- Pull only: the 16h window is useful only if someone looks.
 - Market feeds react within minutes, so the value is mostly in fixed prices and MetaOracles.
 
 ## With more time
 
-- **Alerts** (Telegram, webhooks). Market parameters are immutable, so what's worth alerting on is: allocation shifts, MetaOracle challenges or switches, and cap or adapter changes. Nobody polls an API, and the info only helps if it arrives before the window closes.
-- Liquidity at risk per market, DEX price comparison, standalone V1 vaults, more chains.
+- **Alerts** (Telegram, webhooks). The data model (snapshots keyed by a stable `assumptionId`) already supports them. Missing: delivery, MetaOracle state tracking (its events or a periodic poll), cap and adapter events (not indexed today), and a changes feed. Worth alerting on: allocation shifts, MetaOracle challenges or switches, cap or adapter changes.
+- Liquidity at risk per market, standalone V1 vaults, more chains.
