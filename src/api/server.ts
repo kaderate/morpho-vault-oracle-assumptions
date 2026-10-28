@@ -11,7 +11,7 @@ export interface ServerDeps {
   registry: Registry;
   vaults: Address[];
   repo: Repo;
-  logger?: boolean;
+  logger?: boolean | { stream: { write(line: string): void } };
 }
 
 export class ApiError extends Error {
@@ -24,17 +24,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const { reader, registry, repo } = deps;
   const tracked = new Set(deps.vaults.map((v) => getAddress(v)));
   const app = Fastify({ logger: deps.logger ?? false });
+  // Never log the error object itself: viem errors carry the RPC URL (with its API key) in their message and cause chain.
+  const brief = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message.split('\n')[0]}` : String(e));
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ApiError) return reply.status(err.status).send({ error: { code: err.code, message: err.message } });
     if (err instanceof RpcUnavailableError) {
-      req.log.warn({ err }, 'rpc unavailable');
+      req.log.warn({ error: brief(err) }, 'rpc unavailable');
       return reply.status(503).send({ error: { code: 'RPC_UNAVAILABLE', message: 'the RPC node could not be reached' } });
     }
     if (err instanceof BlockNotFoundError) {
       return reply.status(404).send({ error: { code: 'BLOCK_NOT_AVAILABLE', message: 'that block is not available on the node' } });
     }
-    req.log.error({ err }, 'unhandled error');
+    req.log.error({ error: brief(err) }, 'unhandled error');
     return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: 'internal error' } });
   });
 

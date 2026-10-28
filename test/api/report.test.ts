@@ -92,4 +92,21 @@ describe('GET /vaults/:address/report', () => {
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'no such route' } });
   });
+
+  it('never logs the RPC URL: viem errors carry it, with its API key, in their cause chain', async () => {
+    const lines: string[] = [];
+    const stream = { write: (l: string) => void lines.push(l) };
+    const leak = new Error('Request body ... URL: https://base.example/v3/SECRETKEY');
+    const down = scenario(1_000_000n, []);
+    down.latest = async () => { throw new RpcUnavailableError('eth_call: HTTP request failed.', { cause: leak }); };
+    const broken = scenario(1_000_000n, []);
+    broken.latest = async () => { throw new Error('boom', { cause: leak }); };
+    for (const reader of [down, broken]) {
+      await buildServer({ reader, registry, vaults: [getAddress(VAULT)], repo, logger: { stream } as never }).inject(`/vaults/${VAULT}/report`);
+    }
+    const logged = lines.join('');
+    expect(logged).toContain('HTTP request failed');
+    expect(logged).toContain('boom');
+    expect(logged).not.toContain('SECRETKEY');
+  });
 });
