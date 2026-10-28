@@ -8,7 +8,8 @@ export type ReasonCode =
   | 'FIXED_PRICE_UNPEGGED'
   | 'ORACLE_REVERTED'
   | 'ORACLE_UNSUPPORTED'
-  | 'UNKNOWN_ADAPTER';
+  | 'UNKNOWN_ADAPTER'
+  | 'TOKEN_UNREADABLE';
 export type DecodedOracle =
   | { class: 'fixed'; address: Address }
   | { class: 'chainlink'; address: Address; feeds: Address[]; baseVault?: Address }
@@ -34,6 +35,7 @@ export type FrozenFor =
 export interface ChainReader {
   call(to: Address, data: Hex, block?: bigint): Promise<Hex | null>; // null on revert
   blockNumber(): Promise<bigint>;
+  latest(): Promise<{ number: bigint; hash: Hex; timestamp: number }>; // head block header, one call
   block(n: bigint): Promise<{ number: bigint; hash: Hex; timestamp: number }>;
   logs(p: { addresses: Address[]; topics0: Hex[]; from: bigint; to: bigint }): Promise<
     { address: Address; blockNumber: bigint; txHash: Hex; logIndex: number }[]

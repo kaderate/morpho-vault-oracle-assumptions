@@ -32,7 +32,7 @@ describe('loadRegistry', () => {
   it('rejects a key that is not an address', () => {
     const dir = mkdtempSync(join(tmpdir(), 'reg-'));
     writeFileSync(join(dir, 'feeds.json'), '{}');
-    writeFileSync(join(dir, 'tokens.json'), JSON.stringify({ nope: { symbol: 'X', underlying: 'X' } }));
+    writeFileSync(join(dir, 'tokens.json'), JSON.stringify({ nope: { symbol: 'X' } }));
     expect(() => loadRegistry(dir)).toThrow(/tokens\.json.*nope/);
   });
 });

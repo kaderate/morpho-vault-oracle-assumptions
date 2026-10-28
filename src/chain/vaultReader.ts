@@ -1,9 +1,9 @@
-import { hexToString, trim } from 'viem';
 import type { Address, ChainReader, Position } from '../types.js';
 import {
-  erc20Abi, erc20Bytes32Abi, MORPHO, marketAdapterAbi, morphoAbi, vaultAdapterAbi, vaultV1Abi, vaultV2Abi,
+  erc20Abi, MORPHO, marketAdapterAbi, morphoAbi, vaultAdapterAbi, vaultV1Abi, vaultV2Abi,
 } from './abis.js';
 import { read } from './call.js';
+import { RevertedError } from './errors.js';
 
 export interface VaultState {
   name: string;
@@ -16,16 +16,13 @@ export interface VaultState {
 // A required getter that reverts is an error (the vault state would be wrong), never a silent default.
 async function need<T>(reader: ChainReader, to: Address, abi: Parameters<typeof read>[2], fn: string, args: readonly unknown[], block?: bigint): Promise<T> {
   const v = await read<T>(reader, to, abi, fn, args, block);
-  if (v === null) throw new Error(`${fn}(${args.join(',')}) on ${to} reverted`);
+  if (v === null) throw new RevertedError(`${fn}(${args.join(',')}) on ${to} reverted`);
   return v;
 }
 
 export async function readToken(reader: ChainReader, token: Address, block?: bigint): Promise<{ symbol: string; decimals: number }> {
-  let symbol = await read<string>(reader, token, erc20Abi, 'symbol', [], block);
-  if (symbol === null) {
-    const raw = await read<`0x${string}`>(reader, token, erc20Bytes32Abi, 'symbol', [], block);
-    if (raw !== null) symbol = hexToString(trim(raw, { dir: 'right' }));
-  }
+  // A symbol that does not decode (e.g. an old token returning bytes32) falls back to the address.
+  const symbol = await read<string>(reader, token, erc20Abi, 'symbol', [], block);
   const decimals = await need<number>(reader, token, erc20Abi, 'decimals', [], block);
   return { symbol: symbol ?? token, decimals };
 }
@@ -50,15 +47,20 @@ export async function readVault(reader: ChainReader, vault: Address, block?: big
 
   for (let i = 0; i < count; i++) {
     const adapter = await need<Address>(reader, vault, vaultV2Abi, 'adapters', [BigInt(i)], block);
-    const v1 = await read<Address>(reader, adapter, vaultAdapterAbi, 'morphoVaultV1', [], block);
-    if (v1 !== null) {
-      add(await readVaultAdapter(reader, adapter, v1, block));
-      continue;
-    }
-    const n = await read<bigint>(reader, adapter, marketAdapterAbi, 'marketIdsLength', [], block);
-    if (n !== null) {
-      add(await readMarketAdapter(reader, adapter, Number(n), block));
-      continue;
+    try {
+      const v1 = await read<Address>(reader, adapter, vaultAdapterAbi, 'morphoVaultV1', [], block);
+      if (v1 !== null) {
+        add(await readVaultAdapter(reader, adapter, v1, block));
+        continue;
+      }
+      const n = await read<bigint>(reader, adapter, marketAdapterAbi, 'marketIdsLength', [], block);
+      if (n !== null) {
+        add(await readMarketAdapter(reader, adapter, Number(n), block));
+        continue;
+      }
+    } catch (e) {
+      // An adapter that looks like one of ours but reverts when read is reported as unknown; an outage still throws.
+      if (!(e instanceof RevertedError)) throw e;
     }
     unknownAdapters.push(adapter);
   }
@@ -98,4 +100,16 @@ async function readVaultAdapter(reader: ChainReader, adapter: Address, v1: Addre
   const leftover = real - scaled.reduce((s, p) => s + p.assets, 0n);
   scaled[scaled.length - 1]!.assets += leftover;
   return scaled;
+}
+
+// The V1 vaults behind the vault's MorphoVaultV1Adapters (their events also move the vault's money).
+export async function resolveV1Vaults(reader: ChainReader, vault: Address, block?: bigint): Promise<Address[]> {
+  const count = Number(await need<bigint>(reader, vault, vaultV2Abi, 'adaptersLength', [], block));
+  const out: Address[] = [];
+  for (let i = 0; i < count; i++) {
+    const adapter = await need<Address>(reader, vault, vaultV2Abi, 'adapters', [BigInt(i)], block);
+    const v1 = await read<Address>(reader, adapter, vaultAdapterAbi, 'morphoVaultV1', [], block);
+    if (v1 !== null) out.push(v1);
+  }
+  return out;
 }

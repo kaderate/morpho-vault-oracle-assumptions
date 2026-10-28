@@ -19,9 +19,9 @@ Time box: **4 hours.** See `BusinessCase.md` for the why and `ARCHITECTURE.md` f
 - Percentages are numbers in percent, one decimal (`76.3`, `lltvPct: 91.5`). Fields end in `Pct`.
 - Amounts are exact decimal strings in token units (`"463354112.1"`), with the token in a top-level `asset: { symbol, decimals }`. No dollar values: the project has no price source.
 - Durations come as `seconds` plus a `human` string (`"at least 16h"`).
-- Staleness: `stale: boolean` and `staleSeconds: number | null` (age of the snapshot served instead of live data).
+- Staleness: there is no stale mode. If the RPC is down, `/report` answers 503 `RPC_UNAVAILABLE`; the service never serves old data as if it were current.
 - Shares are of the vault's `totalAssets`: exposures + `idle` + `noAssumption` + `unknown` add up to 100 (±0.1). `noAssumption` holds markets where the collateral is priced as itself (WETH by ETH/USD): no hidden bet, but still vault money.
-- Fixed enums (documented here, typed in code): `oracleClass`: `fixed | chainlink | metaoracle | unknown`; `frozenFor.kind`: `unbounded | timelock | feed_heartbeat | unknown`; MetaOracle `state`: `primary | challenged | backup | healing`; `reasonCode`: `FEED_NOT_IN_REGISTRY | TOKEN_NOT_IN_REGISTRY | FIXED_PRICE_UNPEGGED | ORACLE_REVERTED | ORACLE_UNSUPPORTED | UNKNOWN_ADAPTER`.
+- Fixed enums (documented here, typed in code): `oracleClass`: `fixed | chainlink | metaoracle | unknown`; `frozenFor.kind`: `unbounded | timelock | feed_heartbeat | unknown`; MetaOracle `state`: `primary | challenged | backup | healing`; `reasonCode`: `FEED_NOT_IN_REGISTRY | TOKEN_NOT_IN_REGISTRY | FIXED_PRICE_UNPEGGED | ORACLE_REVERTED | ORACLE_UNSUPPORTED | UNKNOWN_ADAPTER | TOKEN_UNREADABLE`.
 - Errors: `{ "error": { "code": "...", "message": "..." } }` with `INVALID_ADDRESS` (400), `VAULT_NOT_TRACKED` (404), `BLOCK_NOT_AVAILABLE` (404), `MARKET_NOT_FOUND` (404), `RPC_UNAVAILABLE` (503, no snapshot to fall back on), `INVALID_PARAMETER` (400, e.g. `block=abc`), `INTERNAL_ERROR` (500, unexpected failure; the cause is logged, not returned).
 - `assumptionId` is the stable key of an assumption (lowercase `<collateral symbol>:<priced asset>`, e.g. `usde:usd`, `cbbtc:btc`, `wsteth:exchange-rate`). Use it to group, diff and deduplicate; `assumption` is only the label.
 
@@ -39,7 +39,7 @@ Defaults to the latest block.
 ```json
 {
   "vault": "0xbeeff249…8845", "name": "Steakhouse High Yield USDC Edition",
-  "block": 53206000, "asOf": "2026-10-28T12:00:00Z", "stale": false, "staleSeconds": null,
+  "block": 53206000, "asOf": "2026-10-28T12:00:00Z",
   "asset": { "symbol": "USDC", "decimals": 6 }, "totalAssets": "463354112.1",
   "exposures": [{
     "assumptionId": "usde:usd", "assumption": "USDe = 1 USD", "oracleClass": "metaoracle",
@@ -51,7 +51,7 @@ Defaults to the latest block.
   }],
   "idle": { "sharePct": 0.0 },
   "noAssumption": { "sharePct": 0.0, "markets": [] },
-  "unknown": { "sharePct": 19.8, "markets": [{ "id": "0x…", "collateral": "mGLO", "loan": "USDC",
+  "unknown": { "sharePct": 19.8, "adapters": [], "markets": [{ "id": "0x…", "collateral": "mGLO", "loan": "USDC",
                "reasonCode": "FEED_NOT_IN_REGISTRY", "reason": "feed 0x… is not in registry/feeds.json" }] }
 }
 ```
@@ -87,9 +87,6 @@ Decoded oracle of a market, as far as the registry allows.
 ```
 For a `chainlink` oracle, `oracle` carries `feeds` (each with registry `pair`, `type`, `deviationPct`, `heartbeatSeconds` when known). For an `unknown` oracle, it carries `reasonCode` and `reason` only. `deviationPct` is the current gap between the primary and the backup price, to compare with `deviationThresholdPct`. A market whose collateral is the zero address returns `MARKET_NOT_FOUND`-style 404 with a message (it has no oracle).
 
-### `GET /health`
-RPC reachable, latest block, indexer lag per vault, DB.
-
 ## Computation
 
 - **Exposure**: vault assets per market at block B. Via a `MorphoVaultV1Adapter`: each V1 market's assets × (adapter `realAssets` / V1 `totalAssets`). Idle assets are reported as `idle`. Assumptions are summed by `assumptionId`.
@@ -118,11 +115,11 @@ RPC reachable, latest block, indexer lag per vault, DB.
 | Oracle decoder + registry (only the feeds reached by the tracked vaults) | 0:35 |
 | Analysis: assumptions, breakpoints, frozen-for | 0:20 |
 | Indexer: logs, snapshots, checkpoint, rollback | 0:45 |
-| API: report, oracle, peak, health | 0:25 |
+| API: report, oracle, peak | 0:25 |
 | Tests (decoder fixtures, analysis, indexer, peak SQL) | 0:30 |
 | README, BusinessCase check, final run on real vaults | 0:15 |
 
-Total 3:40. **Cut order if late**: `/health` → `/peak` → rollback logic (keep the confirmation depth) → backfill beyond 7 days → number of tracked vaults (down to 3).
+Total 3:40. **Cut order if late**: `/peak` → rollback logic (keep the confirmation depth) → backfill beyond 7 days → number of tracked vaults (down to 3).
 
 ## Risks and assumptions to verify early (first 30 min)
 

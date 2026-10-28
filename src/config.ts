@@ -1,5 +1,4 @@
 import { getAddress, isAddress } from 'viem';
-import { z } from 'zod';
 import type { Address } from './types.js';
 
 export interface Config {
@@ -11,45 +10,35 @@ export interface Config {
   port: number;
 }
 
-const vaultList = z
-  .string()
-  .min(1, 'required')
-  .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean))
-  .pipe(
-    z.array(z.string().refine((v) => isAddress(v, { strict: false }), 'not an address')).min(1, 'at least one vault'),
-  )
-  .transform((list) => list.map((v) => getAddress(v) as Address));
-
-const int = (def: number) =>
-  z
-    .string()
-    .regex(/^\d+$/, 'must be a non-negative integer')
-    .transform(Number)
-    .optional()
-    .transform((v) => v ?? def);
-
-const schema = z.object({
-  RPC_URL: z.string({ error: 'required' }).url('must be a URL'),
-  VAULTS: vaultList,
-  DATABASE_URL: z.string().default('postgres://app:app@localhost:5432/oracle'),
-  CONFIRMATIONS: int(20),
-  BACKFILL_DAYS: int(7),
-  PORT: int(3000),
-});
-
+// Reads the environment and reports every invalid variable at once, so one run fixes them all.
 export function loadConfig(env: Record<string, string | undefined>): Config {
-  const parsed = schema.safeParse(env);
-  if (!parsed.success) {
-    const lines = parsed.error.issues.map((i) => `${i.path.join('.') || 'env'}: ${i.message}`);
-    throw new Error(`Invalid configuration:\n${lines.join('\n')}`);
-  }
-  const e = parsed.data;
+  const errors: string[] = [];
+  const int = (name: string, fallback: number) => {
+    const raw = env[name];
+    if (raw === undefined || raw === '') return fallback;
+    if (!/^\d+$/.test(raw)) errors.push(`${name}: must be a non-negative integer, got "${raw}"`);
+    return Number(raw);
+  };
+
+  const rpcUrl = env.RPC_URL ?? '';
+  if (!URL.canParse(rpcUrl)) errors.push('RPC_URL: required, must be a URL');
+
+  const listed = (env.VAULTS ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+  if (listed.length === 0) errors.push('VAULTS: required, comma-separated vault addresses');
+  const bad = listed.filter((v) => !isAddress(v, { strict: false }));
+  if (bad.length > 0) errors.push(`VAULTS: not an address: ${bad.join(', ')}`);
+
+  const confirmations = int('CONFIRMATIONS', 20);
+  const backfillDays = int('BACKFILL_DAYS', 7);
+  const port = int('PORT', 3000);
+
+  if (errors.length > 0) throw new Error(`Invalid configuration:\n${errors.join('\n')}`);
   return {
-    rpcUrl: e.RPC_URL,
-    databaseUrl: e.DATABASE_URL,
-    vaults: e.VAULTS,
-    confirmations: e.CONFIRMATIONS,
-    backfillDays: e.BACKFILL_DAYS,
-    port: e.PORT,
+    rpcUrl,
+    databaseUrl: env.DATABASE_URL || 'postgres://app:app@localhost:5433/oracle',
+    vaults: listed.map((v) => getAddress(v) as Address),
+    confirmations,
+    backfillDays,
+    port,
   };
 }

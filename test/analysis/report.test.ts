@@ -1,4 +1,4 @@
-import { zeroAddress } from 'viem';
+import { getAddress, zeroAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
 import { buildReport } from '../../src/analysis/report.js';
 import { loadRegistry } from '../../src/analysis/registry.js';
@@ -7,6 +7,35 @@ import {
 } from '../helpers/vaultScenario.js';
 
 const registry = loadRegistry('registry');
+
+describe('buildReport: failure paths', () => {
+  const WEIRD = '0x00000000000000000000000000000000000000c1' as const;
+
+  it('money behind an unrecognised adapter is unknown, never idle', async () => {
+    const c = scenario(1_000_000n, [{ n: 1, collateral: USDE, oracle: oracleAddr(2), lltv: LLTV_915, assets: 700_000n }], [WEIRD]);
+    fixedOracle(c, oracleAddr(2));
+    const r = await buildReport({ reader: c, registry }, VAULT);
+    expect(r.idle.sharePct).toBe(0);
+    expect(r.unknown.sharePct).toBe(30);
+    expect(r.unknown.adapters).toEqual([{ address: getAddress(WEIRD), reasonCode: 'UNKNOWN_ADAPTER' }]);
+    const sum = r.exposures.reduce((s, e) => s + e.sharePct, 0) + r.idle.sharePct + r.noAssumption.sharePct + r.unknown.sharePct;
+    expect(sum).toBe(100);
+  });
+
+  it('a collateral token that cannot be read makes that market unknown; the rest is served', async () => {
+    const c = scenario(1_000_000n, [
+      { n: 1, collateral: USDE, oracle: oracleAddr(2), lltv: LLTV_915, assets: 600_000n },
+      { n: 2, collateral: CBBTC, oracle: oracleAddr(1), lltv: LLTV_86, assets: 400_000n },
+    ]);
+    fixedOracle(c, oracleAddr(2)); feedOracle(c, oracleAddr(1), BTC_USD);
+    const real = c.call.bind(c);
+    c.call = async (to, data, block) => (to === USDE ? null : real(to, data, block)); // USDe: decimals() reverts
+    const r = await buildReport({ reader: c, registry }, VAULT);
+    expect(r.exposures.map((e) => e.assumptionId)).toEqual(['cbbtc:btc']);
+    expect(r.unknown.markets).toEqual([expect.objectContaining({ id: id(1), collateral: USDE, reasonCode: 'TOKEN_UNREADABLE' })]);
+    expect(r.unknown.sharePct).toBe(60);
+  });
+});
 
 describe('buildReport', () => {
   it('sums two markets with the same assumption and keeps the worst-case breakpoints', async () => {
@@ -84,7 +113,7 @@ describe('buildReport', () => {
     const r = await buildReport({ reader: c, registry }, VAULT);
     expect(r.exposures.map((e) => e.assumptionId)).toEqual(['usde:usd', 'cbbtc:btc']);
     expect([...c.blocksSeen]).toEqual([100n]);
-    expect(r).toMatchObject({ vault: VAULT, name: 'Test Vault', block: 100, asOf: '2023-11-14T22:13:20.000Z', stale: false, staleSeconds: null });
+    expect(r).toMatchObject({ vault: VAULT, name: 'Test Vault', block: 100, asOf: '2023-11-14T22:13:20.000Z' });
     expect(r.asset).toEqual({ symbol: 'USDC', decimals: 6 });
     expect(r.totalAssets).toBe('1');
   });

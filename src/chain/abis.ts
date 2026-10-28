@@ -57,5 +57,3 @@ export const erc20Abi = parseAbi([
   'function symbol() view returns (string)',
   'function decimals() view returns (uint8)',
 ]);
-// Some old tokens (MKR-style) return symbol() as bytes32.
-export const erc20Bytes32Abi = parseAbi(['function symbol() view returns (bytes32)']);

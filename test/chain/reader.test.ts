@@ -1,5 +1,6 @@
 import { custom, HttpRequestError, RpcRequestError } from 'viem';
 import { describe, expect, it } from 'vitest';
+import { BlockNotFoundError, RpcUnavailableError } from '../../src/chain/errors.js';
 import { createViemReader } from '../../src/chain/reader.js';
 
 const TO = '0x00000000000000000000000000000000000000a1';
@@ -35,7 +36,7 @@ describe('createViemReader', () => {
 
   it('throws when the transport keeps failing (never turns an outage into a revert)', async () => {
     const r = reader(async () => { throw new HttpRequestError({ url: 'http://unused', status: 503 }); });
-    await expect(r.call(TO, '0x12345678')).rejects.toThrow();
+    await expect(r.call(TO, '0x12345678')).rejects.toBeInstanceOf(RpcUnavailableError);
   });
 
   it('never runs more than `concurrency` requests at once', async () => {
@@ -48,5 +49,27 @@ describe('createViemReader', () => {
     // distinct data so they cannot share a batch
     await Promise.all(Array.from({ length: 6 }, (_, i) => r.blockNumber().then(() => r.call(TO, `0x1234567${i}`))));
     expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it('block() of a block that does not exist throws BlockNotFoundError', async () => {
+    const r = reader(async () => null); // eth_getBlockByNumber answers null
+    await expect(r.block(99_999_999_999n)).rejects.toBeInstanceOf(BlockNotFoundError);
+  });
+
+  it('latest() returns the head block header in one call', async () => {
+    const r = reader(async () => ({
+      number: '0x10', hash: `0x${'11'.repeat(32)}`, timestamp: '0x65', parentHash: `0x${'00'.repeat(32)}`, transactions: [], uncles: [],
+    }));
+    expect(await r.latest()).toEqual({ number: 16n, hash: `0x${'11'.repeat(32)}`, timestamp: 101 });
+  });
+
+  it('latest() failing surfaces as RpcUnavailableError', async () => {
+    const r = reader(async () => { throw new HttpRequestError({ url: 'http://unused', status: 503 }); });
+    await expect(r.latest()).rejects.toBeInstanceOf(RpcUnavailableError);
+  });
+
+  it('blockNumber() failing surfaces as RpcUnavailableError', async () => {
+    const r = reader(async () => { throw new HttpRequestError({ url: 'http://unused', status: 503 }); });
+    await expect(r.blockNumber()).rejects.toBeInstanceOf(RpcUnavailableError);
   });
 });

@@ -15,7 +15,6 @@ const feedSchema = z.object({
 });
 const tokenSchema = z.object({
   symbol: z.string(),
-  underlying: z.string(),
   peg: z.literal('USD').optional(),
   trivialWith: z.array(z.string()).optional(),
 });

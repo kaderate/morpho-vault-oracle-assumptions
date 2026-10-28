@@ -31,6 +31,6 @@ describe('loadConfig', () => {
     expect(cfg.confirmations).toBe(20);
     expect(cfg.backfillDays).toBe(7);
     expect(cfg.port).toBe(3000);
-    expect(cfg.databaseUrl).toBe('postgres://app:app@localhost:5432/oracle');
+    expect(cfg.databaseUrl).toBe('postgres://app:app@localhost:5433/oracle');
   });
 });

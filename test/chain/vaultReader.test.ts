@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  erc20Abi, erc20Bytes32Abi, MORPHO, marketAdapterAbi, morphoAbi, vaultAdapterAbi, vaultV1Abi, vaultV2Abi,
+  erc20Abi, MORPHO, marketAdapterAbi, morphoAbi, vaultAdapterAbi, vaultV1Abi, vaultV2Abi,
 } from '../../src/chain/abis.js';
+import { RevertedError } from '../../src/chain/errors.js';
 import { readMarket } from '../../src/chain/marketReader.js';
 import { readToken, readVault } from '../../src/chain/vaultReader.js';
 import type { Address, Hex } from '../../src/types.js';
@@ -77,8 +78,23 @@ describe('readVault', () => {
     expect(v.positions).toEqual([{ marketId: id(1), assets: 400n }]);
   });
 
+  it('an adapter whose getters revert is listed as unknown; the other adapters are still read', async () => {
+    const chain = new FakeChain();
+    const broken = a(0x601);
+    baseVault(chain, [broken, ADAPTER], 500n);
+    chain
+      .on(broken, marketAdapterAbi, 'marketIdsLength', [], 1n) // looks like a market adapter, but marketIds(0) reverts
+      .on(ADAPTER, marketAdapterAbi, 'marketIdsLength', [], 1n)
+      .on(ADAPTER, marketAdapterAbi, 'marketIds', [0n], id(1))
+      .on(ADAPTER, marketAdapterAbi, 'expectedSupplyAssets', [id(1)], 400n);
+    const v = await readVault(chain, VAULT);
+    expect(v.unknownAdapters).toEqual([broken]);
+    expect(v.positions).toEqual([{ marketId: id(1), assets: 400n }]);
+  });
+
   it('throws when the vault itself does not answer', async () => {
     await expect(readVault(new FakeChain(), VAULT)).rejects.toThrow(/totalAssets/);
+    await expect(readVault(new FakeChain(), VAULT)).rejects.toBeInstanceOf(RevertedError);
   });
 });
 
@@ -95,11 +111,9 @@ describe('readMarket', () => {
 });
 
 describe('readToken', () => {
-  it('handles a bytes32 symbol', async () => {
+  it('falls back to the address when the symbol cannot be decoded', async () => {
     const T = a(0x700);
-    const chain = new FakeChain()
-      .on(T, erc20Bytes32Abi, 'symbol', [], ('0x' + Buffer.from('MKR').toString('hex').padEnd(64, '0')) as Hex)
-      .on(T, erc20Abi, 'decimals', [], 18);
-    expect(await readToken(chain, T)).toEqual({ symbol: 'MKR', decimals: 18 });
+    const chain = new FakeChain().on(T, erc20Abi, 'decimals', [], 18); // symbol() reverts
+    expect(await readToken(chain, T)).toEqual({ symbol: T, decimals: 18 });
   });
 });

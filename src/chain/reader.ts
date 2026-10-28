@@ -1,9 +1,10 @@
 import {
-  BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, createPublicClient, ExecutionRevertedError,
+  BaseError, BlockNotFoundError as ViemBlockNotFoundError, ContractFunctionRevertedError, ContractFunctionZeroDataError, createPublicClient, ExecutionRevertedError,
   http, RawContractError, type Transport,
 } from 'viem';
 import { base } from 'viem/chains';
 import type { Address, ChainReader, Hex } from '../types.js';
+import { BlockNotFoundError, RpcUnavailableError } from './errors.js';
 
 export interface ReaderOptions {
   concurrency?: number; // simultaneous RPC requests (Infura free tier answers 429 to bursts)
@@ -54,6 +55,17 @@ export function createViemReader(rpcUrl: string, opts: ReaderOptions = {}): Chai
   };
   const client = createPublicClient({ chain: base, transport, batch: multicall ? { multicall: true } : undefined });
 
+  // Anything that is not a revert is an outage: callers can tell "could not read" from "contract said no".
+  async function guard<T>(what: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof ViemBlockNotFoundError) throw new BlockNotFoundError(`${what}: block not found`, { cause: e });
+      if (e instanceof RpcUnavailableError || e instanceof BlockNotFoundError) throw e;
+      throw new RpcUnavailableError(`${what}: ${(e as Error).message.split('\n')[0]}`, { cause: e });
+    }
+  }
+
   return {
     async call(to: Address, data: Hex, block?: bigint) {
       try {
@@ -61,19 +73,28 @@ export function createViemReader(rpcUrl: string, opts: ReaderOptions = {}): Chai
         return (r.data ?? null) as Hex | null;
       } catch (e) {
         if (isRevert(e)) return null;
-        throw e;
+        return guard('eth_call', () => Promise.reject(e));
       }
     },
-    blockNumber: () => client.getBlockNumber(),
-    async block(n: bigint) {
-      const b = await client.getBlock({ blockNumber: n });
-      return { number: b.number, hash: b.hash, timestamp: Number(b.timestamp) };
-    },
+    blockNumber: () => guard('eth_blockNumber', () => client.getBlockNumber()),
+    // One call for number and header: asking `blockNumber` then `getBlock(n)` can hit a node that is behind.
+    latest: () =>
+      guard('eth_getBlockByNumber(latest)', async () => {
+        const b = await client.getBlock();
+        return { number: b.number, hash: b.hash, timestamp: Number(b.timestamp) };
+      }),
+    block: (n: bigint) =>
+      guard('eth_getBlockByNumber', async () => {
+        const b = await client.getBlock({ blockNumber: n });
+        return { number: b.number, hash: b.hash, timestamp: Number(b.timestamp) };
+      }),
     async logs({ addresses, topics0, from, to }) {
-      const logs = await client.request({
-        method: 'eth_getLogs',
-        params: [{ address: addresses, topics: [topics0], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}` }],
-      });
+      const logs = await guard('eth_getLogs', () =>
+        client.request({
+          method: 'eth_getLogs',
+          params: [{ address: addresses, topics: [topics0], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}` }],
+        }),
+      );
       return logs.map((l) => ({
         address: l.address,
         blockNumber: BigInt(l.blockNumber as Hex),

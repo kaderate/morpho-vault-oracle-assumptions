@@ -1,0 +1,13 @@
+node_modules
+.env
+.git
+.superpowers
+old
+docs
+test
+scripts
+*.json.bak
+a.json
+b.json
+pnpm-lock.yaml
+pnpm-workspace.yaml

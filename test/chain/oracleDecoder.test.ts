@@ -62,4 +62,12 @@ describe('decodeOracle (real Base fixtures)', () => {
     const o = await decodeOracle(reader, CBBTC);
     expect(o).toMatchObject({ class: 'chainlink', feeds: [CBBTC_FEED] });
   });
+
+  it('a fixed base price combined with a quote feed is not "fixed": unknown ORACLE_UNSUPPORTED', async () => {
+    const reader = fakeReader(fixture, {
+      ...answer(oracleAbi, CBBTC, 'BASE_FEED_1', 'address', '0x0000000000000000000000000000000000000000'),
+      ...answer(oracleAbi, CBBTC, 'QUOTE_FEED_1', 'address', USDC_FEED),
+    });
+    expect(await decodeOracle(reader, CBBTC)).toMatchObject({ class: 'unknown', reasonCode: 'ORACLE_UNSUPPORTED' });
+  });
 });

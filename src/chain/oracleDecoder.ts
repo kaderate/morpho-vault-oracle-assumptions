@@ -43,7 +43,12 @@ async function decodeChainlink(
   const [feed2, baseVault] = await Promise.all([get<Address>('BASE_FEED_2'), get<Address>('BASE_VAULT')]);
   const set = (a: Address | null): a is Address => a !== null && a !== zeroAddress;
   const feeds = [feed1, feed2].filter(set);
-  if (feeds.length === 0 && !set(baseVault)) return { class: 'fixed', address };
+  if (feeds.length === 0 && !set(baseVault)) {
+    // A fixed base price is only a "fixed USD price" when nothing on the quote side moves it.
+    const quote = await Promise.all([get<Address>('QUOTE_FEED_1'), get<Address>('QUOTE_FEED_2'), get<Address>('QUOTE_VAULT')]);
+    if (quote.some(set)) return unknown(address, 'ORACLE_UNSUPPORTED', 'fixed base price combined with a quote-side feed or vault');
+    return { class: 'fixed', address };
+  }
   return { class: 'chainlink', address, feeds, ...(set(baseVault) ? { baseVault } : {}) };
 }
 

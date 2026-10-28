@@ -2,6 +2,7 @@ import { getAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
 import { loadRegistry } from '../../src/analysis/registry.js';
 import { buildServer } from '../../src/api/server.js';
+import { createMemoryRepo } from '../helpers/memoryRepo.js';
 import { scenario, VAULT } from '../helpers/vaultScenario.js';
 
 const registry = loadRegistry('registry');
@@ -18,13 +19,14 @@ describe('GET /vaults', () => {
   });
 
   it('reports the block of the latest stored snapshot when there is a repo', async () => {
-    const repo = { latestSnapshot: async () => ({ block: 99n }) };
+    const { repo } = createMemoryRepo();
+    await repo.insertSnapshot({ vault: getAddress(VAULT), block: 99n, blockHash: `0x${'1'.repeat(64)}`, ts: new Date(), totalAssets: 1n, positions: [] });
     const res = await buildServer({ reader: reader(), registry, vaults: [getAddress(VAULT)], repo }).inject('/vaults');
     expect(res.json().vaults[0].lastSnapshotBlock).toBe(99);
   });
 
   it('lastSnapshotBlock is null when the repo has no snapshot yet', async () => {
-    const repo = { latestSnapshot: async () => null };
+    const { repo } = createMemoryRepo();
     const res = await buildServer({ reader: reader(), registry, vaults: [getAddress(VAULT)], repo }).inject('/vaults');
     expect(res.json().vaults[0].lastSnapshotBlock).toBeNull();
   });

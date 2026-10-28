@@ -1,5 +1,5 @@
 import { zeroAddress } from 'viem';
-import { erc20Abi, MORPHO, marketAdapterAbi, morphoAbi, oracleAbi, vaultV2Abi } from '../../src/chain/abis.js';
+import { erc20Abi, MORPHO, marketAdapterAbi, morphoAbi, oracleAbi, vaultAdapterAbi, vaultV1Abi, vaultV2Abi } from '../../src/chain/abis.js';
 import type { Address, Hex } from '../../src/types.js';
 import { FakeChain } from './fakeChain.js';
 
@@ -30,12 +30,13 @@ function symbol(c: FakeChain, t: Address, sym: string, decimals = 18) {
 }
 
 export interface M { n: number; collateral: Address; oracle: Address; lltv: bigint; assets: bigint }
-export function scenario(totalAssets: bigint, markets: M[]) {
+export function scenario(totalAssets: bigint, markets: M[], extraAdapters: Address[] = []) {
   const c = new FakeChain();
   c.on(VAULT, vaultV2Abi, 'name', [], 'Test Vault').on(VAULT, vaultV2Abi, 'asset', [], USDC)
-    .on(VAULT, vaultV2Abi, 'totalAssets', [], totalAssets).on(VAULT, vaultV2Abi, 'adaptersLength', [], 1n)
+    .on(VAULT, vaultV2Abi, 'totalAssets', [], totalAssets).on(VAULT, vaultV2Abi, 'adaptersLength', [], BigInt(1 + extraAdapters.length))
     .on(VAULT, vaultV2Abi, 'adapters', [0n], ADAPTER)
     .on(ADAPTER, marketAdapterAbi, 'marketIdsLength', [], BigInt(markets.length));
+  extraAdapters.forEach((a, i) => c.on(VAULT, vaultV2Abi, 'adapters', [BigInt(i + 1)], a));
   symbol(c, USDC, 'USDC', 6); symbol(c, USDE, 'USDe'); symbol(c, CBBTC, 'cbBTC', 8); symbol(c, WETH, 'WETH'); symbol(c, MGLO, 'mGLO');
   markets.forEach((m, i) => {
     c.on(ADAPTER, marketAdapterAbi, 'marketIds', [BigInt(i)], id(m.n))
@@ -45,3 +46,24 @@ export function scenario(totalAssets: bigint, markets: M[]) {
   return c;
 }
 
+
+export const V1_VAULT: Address = '0x00000000000000000000000000000000000000b1';
+export const V1_ADAPTER: Address = '0x00000000000000000000000000000000000000b2';
+
+// A vault whose only adapter is a MorphoVaultV1Adapter pointing at V1_VAULT, which holds the USDe market (1 position).
+export function v1Scenario(totalAssets: bigint): FakeChain {
+  const c = new FakeChain();
+  c.on(VAULT, vaultV2Abi, 'name', [], 'Test Vault').on(VAULT, vaultV2Abi, 'asset', [], USDC)
+    .on(VAULT, vaultV2Abi, 'totalAssets', [], totalAssets).on(VAULT, vaultV2Abi, 'adaptersLength', [], 1n)
+    .on(VAULT, vaultV2Abi, 'adapters', [0n], V1_ADAPTER)
+    .on(V1_ADAPTER, vaultAdapterAbi, 'morphoVaultV1', [], V1_VAULT)
+    .on(V1_ADAPTER, vaultAdapterAbi, 'realAssets', [], totalAssets)
+    .on(V1_VAULT, vaultV1Abi, 'withdrawQueueLength', [], 1n)
+    .on(V1_VAULT, vaultV1Abi, 'withdrawQueue', [0n], id(1))
+    .on(MORPHO, morphoAbi, 'position', [id(1), V1_VAULT], [totalAssets * 1_000_000n, 0n, 0n])
+    .on(MORPHO, morphoAbi, 'market', [id(1)], [totalAssets, totalAssets * 1_000_000n, 0n, 0n, 0n, 0n])
+    .on(MORPHO, morphoAbi, 'idToMarketParams', [id(1)], [USDC, USDE, oracleAddr(2), zeroAddress, LLTV_915]);
+  symbol(c, USDC, 'USDC', 6); symbol(c, USDE, 'USDe');
+  fixedOracle(c, oracleAddr(2));
+  return c;
+}

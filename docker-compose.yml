@@ -5,19 +5,21 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: oracle
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5433:5432"] # host access (tests, npm run dev) on localhost only; 5433 because 5432 is often a local Postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d oracle"]
       interval: 3s
       retries: 20
 
-  # Built in Task 9 (Dockerfile).
   service:
     build: .
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      RPC_URL: ${RPC_URL:?set RPC_URL in .env}
+      RPC_URL: ${RPC_URL:?set RPC_URL in .env (see .env.example)}
       VAULTS: ${VAULTS:-0xbeeff2490FEffa212faC2f6553682C219E6a8845}
+      BACKFILL_DAYS: ${BACKFILL_DAYS:-1}
+      CONFIRMATIONS: ${CONFIRMATIONS:-20}
       DATABASE_URL: postgres://app:app@postgres:5432/oracle
-    ports: ["3000:3000"]
+    ports: ["${PORT:-3000}:3000"]
+    restart: unless-stopped

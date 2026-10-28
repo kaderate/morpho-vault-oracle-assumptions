@@ -34,7 +34,7 @@ Read before coding, in this order:
 - A feed's meaning comes from the **registry in the repo** (`registry/*.json`), never guessed from `description()`. `description()` only pre-fills a registry PR. Anything missing is `unknown` and reported apart from the numbers.
 - Real V2 vaults can sit behind a `MorphoVaultV1Adapter` pointing to a V1 vault: read **one** level into it.
 - Amounts are `bigint` in code and strings in JSON. Never use `number` for token amounts.
-- Every API response carries `block` and `asOf`. Stale or unknown data is flagged, not hidden.
+- Every API response carries `block` and `asOf`. Unknown data is flagged, not hidden; the service never serves old data as current (RPC down = 503).
 
 ## Stack and layout
 

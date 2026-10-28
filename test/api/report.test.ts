@@ -3,6 +3,7 @@ import { loadRegistry } from '../../src/analysis/registry.js';
 import { buildServer } from '../../src/api/server.js';
 import { fixedOracle, LLTV_915, oracleAddr, scenario, USDE, VAULT } from '../helpers/vaultScenario.js';
 import { getAddress } from 'viem';
+import { RpcUnavailableError } from '../../src/chain/errors.js';
 
 const registry = loadRegistry('registry');
 const server = () => {
@@ -12,12 +13,12 @@ const server = () => {
 };
 
 describe('GET /vaults/:address/report', () => {
-  it('returns the report with block, asOf, asset, decimal-string totalAssets and staleSeconds null', async () => {
+  it('returns the report with block, asOf, asset and decimal-string totalAssets', async () => {
     const res = await server().inject(`/vaults/${getAddress(VAULT)}/report`);
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body).toMatchObject({
-      block: 100, asOf: '2023-11-14T22:13:20.000Z', stale: false, staleSeconds: null,
+      block: 100, asOf: '2023-11-14T22:13:20.000Z',
       asset: { symbol: 'USDC', decimals: 6 }, totalAssets: '1',
     });
     expect(body.exposures[0]).toMatchObject({ assumptionId: 'usde:usd', sharePct: 76 });
@@ -59,5 +60,28 @@ describe('GET /vaults/:address/report', () => {
     const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report`);
     expect(res.statusCode).toBe(500);
     expect(res.json().error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('RPC down: 503 RPC_UNAVAILABLE', async () => {
+    const chain = scenario(1_000_000n, []);
+    chain.latest = async () => { throw new RpcUnavailableError('down'); };
+    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report`);
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error.code).toBe('RPC_UNAVAILABLE');
+  });
+
+  it('404 BLOCK_NOT_AVAILABLE for a block that does not exist yet', async () => {
+    const res = await server().inject(`/vaults/${VAULT}/report?block=999999`);
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.code).toBe('BLOCK_NOT_AVAILABLE');
+  });
+
+  it('404 BLOCK_NOT_AVAILABLE when the vault did not exist at that block', async () => {
+    const chain = scenario(1_000_000n, []);
+    const real = chain.call.bind(chain);
+    chain.call = async (to, data, block) => (block === 5n ? null : real(to, data, block));
+    const res = await buildServer({ reader: chain, registry, vaults: [getAddress(VAULT)] }).inject(`/vaults/${VAULT}/report?block=5`);
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toMatchObject({ code: 'BLOCK_NOT_AVAILABLE', message: expect.stringContaining('5') });
   });
 });

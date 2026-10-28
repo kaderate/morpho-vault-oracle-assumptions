@@ -13,6 +13,7 @@ export function fakeReader(fixture: Fixture, overrides: Record<string, string | 
       return (calls[key(to, data)] as Hex | null | undefined) ?? null;
     },
     async blockNumber() { return BigInt(fixture.block); },
+    async latest() { return this.block(BigInt(fixture.block)); },
     async block(n) { return { number: n, hash: '0x' + '00'.repeat(32) as Hex, timestamp: 1_700_000_000 }; },
     async logs() { return []; },
   };

@@ -20,6 +20,10 @@ export function liveReader(rpcUrl: string): ChainReader {
       }
     },
     blockNumber: () => client.getBlockNumber(),
+    async latest() {
+      const b = await client.getBlock();
+      return { number: b.number, hash: b.hash, timestamp: Number(b.timestamp) };
+    },
     async block(n) {
       const b = await client.getBlock({ blockNumber: n });
       return { number: b.number, hash: b.hash, timestamp: Number(b.timestamp) };
