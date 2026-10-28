@@ -20,9 +20,9 @@ Time box: **4 hours.** See `BusinessCase.md` for the why and `ARCHITECTURE.md` f
 - Amounts are exact decimal strings in token units (`"463354112.1"`), with the token in a top-level `asset: { symbol, decimals }`. No dollar values: the project has no price source.
 - Durations come as `seconds` plus a `human` string (`"at least 16h"`).
 - Staleness: `stale: boolean` and `staleSeconds: number | null` (age of the snapshot served instead of live data).
-- Shares are of the vault's `totalAssets`: exposures + `idle` + `unknown` add up to 100 (±0.1).
+- Shares are of the vault's `totalAssets`: exposures + `idle` + `noAssumption` + `unknown` add up to 100 (±0.1). `noAssumption` holds markets where the collateral is priced as itself (WETH by ETH/USD): no hidden bet, but still vault money.
 - Fixed enums (documented here, typed in code): `oracleClass`: `fixed | chainlink | metaoracle | unknown`; `frozenFor.kind`: `unbounded | timelock | feed_heartbeat | unknown`; MetaOracle `state`: `primary | challenged | backup | healing`; `reasonCode`: `FEED_NOT_IN_REGISTRY | TOKEN_NOT_IN_REGISTRY | FIXED_PRICE_UNPEGGED | ORACLE_REVERTED | ORACLE_UNSUPPORTED | UNKNOWN_ADAPTER`.
-- Errors: `{ "error": { "code": "...", "message": "..." } }` with `INVALID_ADDRESS` (400), `VAULT_NOT_TRACKED` (404), `BLOCK_NOT_AVAILABLE` (404), `MARKET_NOT_FOUND` (404), `RPC_UNAVAILABLE` (503, no snapshot to fall back on).
+- Errors: `{ "error": { "code": "...", "message": "..." } }` with `INVALID_ADDRESS` (400), `VAULT_NOT_TRACKED` (404), `BLOCK_NOT_AVAILABLE` (404), `MARKET_NOT_FOUND` (404), `RPC_UNAVAILABLE` (503, no snapshot to fall back on), `INVALID_PARAMETER` (400, e.g. `block=abc`), `INTERNAL_ERROR` (500, unexpected failure; the cause is logged, not returned).
 - `assumptionId` is the stable key of an assumption (lowercase `<collateral symbol>:<priced asset>`, e.g. `usde:usd`, `cbbtc:btc`, `wsteth:exchange-rate`). Use it to group, diff and deduplicate; `assumption` is only the label.
 
 ### `GET /vaults`
@@ -50,6 +50,7 @@ Defaults to the latest block.
                   "lltvPct": 91.5, "breakpoints": { "drainPct": 8.5, "badDebtPct": 6.1 } }]
   }],
   "idle": { "sharePct": 0.0 },
+  "noAssumption": { "sharePct": 0.0, "markets": [] },
   "unknown": { "sharePct": 19.8, "markets": [{ "id": "0x…", "collateral": "mGLO", "loan": "USDC",
                "reasonCode": "FEED_NOT_IN_REGISTRY", "reason": "feed 0x… is not in registry/feeds.json" }] }
 }

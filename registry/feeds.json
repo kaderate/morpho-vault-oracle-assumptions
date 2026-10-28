@@ -1,0 +1,151 @@
+{
+  "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F": {
+    "description": "BTC / USD",
+    "base": "BTC",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.1,
+    "heartbeatSeconds": 1200,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x790181e93e9F4Eedb5b864860C12e4d2CffFe73B": {
+    "description": "USDe / USD",
+    "base": "USDe",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70": {
+    "description": "ETH / USD",
+    "base": "ETH",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.15,
+    "heartbeatSeconds": 1200,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34": {
+    "description": "XRP / USD",
+    "base": "XRP",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0xAdB55eF366459c94a318Af2b05A44EEe463f8e63": {
+    "description": "HYPE / USD",
+    "base": "HYPE",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0xC4a161651546983083AeDDDEc5878A2eAf604890": {
+    "description": "ZEC / USD",
+    "base": "ZEC",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x34cD971a092d5411bD69C10a5F0A7EEF72C69041": {
+    "description": "ADA / USD",
+    "base": "ADA",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x206a34e47093125fbf4C75b7c7E88b84c6A77a69": {
+    "description": "LTC / USD",
+    "base": "LTC",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57": {
+    "description": "DOGE / USD",
+    "base": "DOGE",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0x975043adBb80fc32276CbF9Bbcfd4A601a12462D": {
+    "description": "SOL / USD",
+    "base": "SOL",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0xB221fFf161c23C6473a6316294E2d510cfb667b0": {
+    "description": "SOL / USD",
+    "base": "SOL",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (secondaryProxyAddress of the listed pair)"
+  },
+  "0xd7818272B9e248357d13057AAb0B417aF31E817d": {
+    "description": "CBETH / USD",
+    "base": "cbETH",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.15,
+    "heartbeatSeconds": 1200,
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x0ca181015d21A5ed19baFC17F2138883C2b16D54": {
+    "description": "JITOSOL / USD",
+    "base": "JitoSOL",
+    "quote": "USD",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x4b28dFaF2aCaF982524a75409Ab59DFf85942Ad7": {
+    "description": "JITOSOL-SOL Calculated",
+    "base": "JitoSOL",
+    "quote": "SOL",
+    "type": "exchange_rate",
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x868a501e68F3D1E89CfC0D22F6b22E8dabce5F04": {
+    "description": "cbETH-ETH Exchange Rate",
+    "base": "cbETH",
+    "quote": "ETH",
+    "type": "exchange_rate",
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x806b4Ac04501c29769051e42783cF04dCE41440b": {
+    "description": "CBETH / ETH",
+    "base": "cbETH",
+    "quote": "ETH",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  },
+  "0x43a5C292A453A3bF3606fa856197f09D7B74251a": {
+    "description": "WSTETH / ETH",
+    "base": "wstETH",
+    "quote": "ETH",
+    "type": "market",
+    "deviationPct": 0.5,
+    "heartbeatSeconds": 86400,
+    "source": "chainlink reference-data-directory, Base feeds (proxyAddress)"
+  }
+}

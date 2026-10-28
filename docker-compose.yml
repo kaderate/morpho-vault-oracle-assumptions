@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: oracle
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d oracle"]
+      interval: 3s
+      retries: 20
+
+  # Built in Task 9 (Dockerfile).
+  service:
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      RPC_URL: ${RPC_URL:?set RPC_URL in .env}
+      VAULTS: ${VAULTS:-0xbeeff2490FEffa212faC2f6553682C219E6a8845}
+      DATABASE_URL: postgres://app:app@postgres:5432/oracle
+    ports: ["3000:3000"]
