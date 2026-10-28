@@ -5,7 +5,7 @@ Time box: **4 hours.** See `BusinessCase.md` for the why and `ARCHITECTURE.md` f
 ## Decisions
 
 - Lender side only. Only assumptions on the **collateral** are reported ("USDe = $1"). Assumptions on the quote side ("USDC = $1") hurt the borrower, not the lender, so they are not exposed. No `threatensLender` field. Edge case lost: a loan token that collapses.
-- Fixed list of 3 to 5 Base V2 vaults, including one large vault for the demo. No auto-discovery. A short list keeps the feed registry small.
+- Fixed list of 3 to 5 Base V2 vaults. Demo vault: Steakhouse High Yield USDC Edition `0xbeeff2490FEffa212faC2f6553682C219E6a8845` (463 M$, 76.3% in the USDe/USDC MetaOracle market, 19.8% mGLO). Others to track: Grove x Steakhouse USDC `0xbeef0786…e7c7`, Steakhouse Prime USDC `0xbeef0e08…73C9`, Gauntlet USDC Prime `0x050cE30b…56f0`, Clearstar cbAssets `0x91C056B6…3a3c`. No auto-discovery. A short list keeps the feed registry small.
 - V2 vaults plus **one level** of V1 vault behind a `MorphoVaultV1Adapter` (real V2 vaults use it). Standalone V1 vaults are out.
 - Event indexer, not polling. No `/changes` endpoint. `/peak` is in.
 - No risk score. Facts only.
@@ -84,8 +84,8 @@ Total 3:40. **Cut order if late**: `/health` → `/peak` → rollback logic (kee
 
 ## Risks and assumptions to verify early (first 30 min)
 
-- Direct `MorphoMarketV1` adapters are said to expose `marketIds()` and `expectedSupplyAssets(id)`; I only verified the `MorphoVaultV1Adapter` path (`morphoVaultV1()`, `realAssets()`). Check both on the chosen demo vault.
-- **RPC (measured, QuickNode free plan, Base)**: historical `eth_call` works at least 90 days back, Multicall3 exists at those blocks, JSON-RPC batches of 50 work, the limit is 15 requests/second (429 beyond), and `eth_getLogs` is **limited to a 5-block range** (error -32615), so it cannot backfill. Public endpoints: `mainnet.base.org` returns 429 on `getLogs` within a few requests, `1rpc.io` caps at 50 blocks, `drpc` free at 10k blocks, `base-rpc.publicnode.com` worked with 10k-block chunks. Decision: two configurable URLs, `RPC_URL` for state reads (QuickNode) and `LOGS_RPC_URL` for `getLogs` (default `https://base-rpc.publicnode.com`), with a concurrency cap of about 10 and backoff on 429.
+- Two adapter types exist and both must be read. `MorphoMarketV1` (direct, used by the largest vaults): `marketIdsLength()`, `marketIds(index)`, `expectedSupplyAssets(marketId)`, verified on the demo vault. `MorphoVaultV1Adapter` (smaller vaults): `morphoVaultV1()`, `realAssets()`. Anything else is reported as an unknown adapter.
+- **RPC (measured, Infura free plan, Base)**: one URL does everything. Historical `eth_call` works at least 90 days back, Multicall3 exists at those blocks, JSON-RPC batches of 50 work, and `eth_getLogs` accepts up to 10,000 blocks per call (50,000 returns -32602). Rate limiting is stricter than it looks: 7 of 40 sequential `eth_call` returned 429 at about 3.6 requests/second, and one `getLogs` of 100 blocks got a 429, so the real limit (requests/second or daily credits) is not known. Design: a single `RPC_URL`, `getLogs` in 10,000-block chunks, concurrency of 3 to 4, Multicall3 and JSON-RPC batches to cut request count, backoff on 429. QuickNode free was rejected (`getLogs` limited to 5 blocks). Public endpoints are not reliable for `getLogs` (`mainnet.base.org` 429, `1rpc.io` 50 blocks, `drpc` free 10k, `publicnode` worked).
 - Chainlink deviation and heartbeat for each reached feed must be filled by hand from Chainlink's data; a missing value gives `unknown`, not a guess.
 - The cbBTC/USD feed `0x64c9…848F` returns `BTC / USD` but its contract type is unverified.
 - Interest accrual is ignored between snapshots, so exposures are slightly off between events.
