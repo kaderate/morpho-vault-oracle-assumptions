@@ -6,8 +6,8 @@ A lender is only protected by liquidations, and liquidations only trigger when t
 
 When that assumption breaks, nobody gets liquidated, and the remaining liquidity can be borrowed against overvalued collateral. It keeps happening:
 
-- **xUSD** (Nov 2025): ~$700k bad debt in one vault.
-- **Resolv wstUSR** (Mar 2026): ~15 vaults hit, priced at $1.13 while trading near $0.63. Estimates of Morpho bad debt range from ~$3.8M to ~$6.2M.
+- **xUSD** (Nov 2025): about $0.7M of bad debt reported on Morpho, in curated vaults.
+- **Resolv wstUSR** (Mar 2026): ~15 vaults hit, priced at $1.13 while trading near $0.63. Estimates of Morpho bad debt are in the $4M to $6M range and vary by source.
 
 A depositor sees an APY and a curator name. They can't see these bets.
 
@@ -20,7 +20,7 @@ It reads the chain over an RPC, follows the vault's adapters to its markets, dec
 1. **Exposure per assumption**, e.g. "76% of this vault bets USDe = $1".
 2. **Two breakpoints per market**: the price drop that drains liquidity (1 − LLTV) and the smaller one that creates bad debt (~1 − LLTV × LIF).
 3. **How long the oracle can stay frozen**, when it can be computed.
-4. **Peak exposure** over the indexed window (up to 30 days), since allocations can shift instantly.
+4. **Peak exposure** over the indexed history (30 days by default), since allocations can shift instantly.
 
 No score, only facts. The reader decides.
 
@@ -35,10 +35,9 @@ Morpho leaves oracle choice to curators, and the incidents above were amplified 
 | Existing | Gap |
 |---|---|
 | Credora (RedStone) vault ratings | Oracle modifier is qualitative, not quantified publicly |
-| Morpho app warnings | Fire only once the price is 10x off |
-| Morpho Oracle Portal | Decodes one oracle at a time, for deployers; no vault view |
-| Sigma Labs RFC (unfunded) | Badges in a registry, 6 months out |
-| Chaos Labs, Gauntlet, Hypernative | Built for curators, compare oracle with market price |
+| Morpho app warnings | Per-market flags (e.g. hardcoded or unrecognized feeds); no vault-level exposure, no blind window |
+| Morpho Oracle Interface | Inspects and tests one oracle at a time, for deployers; no vault view |
+| Curator risk tools (Gauntlet, Chaos Labs, ...) | Built for curators; compare the oracle with the market price |
 
 Mine is vault-level, computed from the chain, and reproducible at a given block.
 
@@ -48,7 +47,7 @@ Mine is vault-level, computed from the chain, and reproducible at a given block.
 - Only assumptions on the collateral side are reported, since they are the lender's risk.
 - Feed meaning comes from a versioned registry in the repo, filled by hand. Unknown feeds are labeled *unknown*, never guessed: on the demo vault, ~20% is unknown (a custom mGLO feed).
 - Pull only: the 16h window is useful only if someone looks.
-- Market feeds react within minutes, so the value is mostly in fixed prices and MetaOracles.
+- Market feeds update on a small price move (0.1% to 0.5% in the registry), so the value is mostly in fixed prices and MetaOracles.
 
 ## With more time
 
