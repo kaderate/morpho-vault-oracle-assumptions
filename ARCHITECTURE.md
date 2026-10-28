@@ -12,7 +12,7 @@
 ```
 
 ## Components
-- **Config**: RPC URL, tracked V2 vaults (fixed list), confirmation depth, backfill days, path to the feed and token registry.
+- **Config**: state RPC URL and a separate `getLogs` RPC URL (free plans often limit `getLogs`), tracked V2 vaults (fixed list), confirmation depth, backfill days, path to the feed and token registry.
 - **Chain readers**: at a given block, read the vault's adapters, follow a `MorphoVaultV1Adapter` one level into its V1 vault (withdraw queue and positions), and return the vault's assets per market. Calls are batched with Multicall3. Any block can be read, so the same code serves "now" and "at an event block".
 - **Oracle decoder**: per market oracle, classify as `fixed` (no feed), `chainlink` (`MorphoChainlinkOracleV2` immutables), `metaoracle` (primary, backup, threshold, timelocks, current state) or `unknown`. Market parameters are immutable, so decoded oracles are cached in the `markets` table.
 - **Registry** (`registry/*.json`, versioned in the repo, extended by PR): feed address → priced asset, `market` or `exchange_rate`, deviation threshold, heartbeat; token → underlying and relation (wrapper, USD-pegged...). A feed or token missing from the registry gives `unknown`, never a guess.
@@ -35,4 +35,4 @@
 - Peak: SQL query on seeded snapshots.
 
 ## Run locally
-`docker compose up` starts Postgres and the service. Environment variables: `RPC_URL`, `VAULTS`, `CONFIRMATIONS`, `BACKFILL_DAYS`.
+`docker compose up` starts Postgres and the service. Environment variables: `RPC_URL`, `LOGS_RPC_URL`, `VAULTS`, `CONFIRMATIONS`, `BACKFILL_DAYS`.
