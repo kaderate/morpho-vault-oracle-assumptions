@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildReport } from '../../src/analysis/report.js';
 import { loadRegistry } from '../../src/analysis/registry.js';
 import {
-  BTC_USD, CBBTC, ETH_USD, feedOracle, fixedOracle, id, LLTV_86, LLTV_915, MGLO, MGLO_FEED, oracleAddr, scenario, USDC, USDE, VAULT, WETH,
+  BTC_USD, CBBTC, ETH_USD, feedOracle, fixedOracle, id, LLTV_86, LLTV_915, MGLO, MGLO_FEED, oracleAddr, scenario, USDE, VAULT, WETH,
 } from '../helpers/vaultScenario.js';
 
 const registry = loadRegistry('registry');

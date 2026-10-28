@@ -10,9 +10,9 @@ Example, read on-chain on the demo vault (Steakhouse High Yield USDC, 2026-10-28
 
 ```
  RPC (Base) ──► Indexer ──────► Postgres ◄──── API (Fastify)
-   (viem)      allocation       snapshots       /vaults, /vaults/:a/report
+   (viem)      allocation       snapshots       /vaults/:a/report
       │        events →         markets         /vaults/:a/peak
-      │        snapshot at      checkpoints     /markets/:id/oracle
+      │        snapshot at      checkpoints
       │        that block
       └──► Chain readers ──► Oracle decoder ──► Analysis (pure)
            vault V2 → adapter   fixed | chainlink |   assumptions, breakpoints,
@@ -40,7 +40,7 @@ docker compose up --build   # Postgres + service on http://localhost:3000
 scripts/demo.sh             # calls the main endpoints for the demo vault (needs jq)
 ```
 
-The first boot backfills `BACKFILL_DAYS` of history (compose default: 1 day, about 2 minutes; the code default is 7). `/report` and `/oracle` answer right away; `/peak` fills in as the backfill progresses and says so in `coverage`.
+The first boot backfills `BACKFILL_DAYS` of history (compose default: 1 day, about 2 minutes; the code default is 7). `/report` answers right away; `/peak` fills in as the backfill progresses and says so in `coverage`.
 
 Without Docker for the service: `docker compose up -d postgres`, then `npm ci && npm run dev` (reads `.env`).
 
@@ -55,15 +55,13 @@ Without Docker for the service: `docker compose up -d postgres`, then `npm ci &&
 
 ## API
 
-Every response carries `block` and `asOf`. Amounts are decimal strings; `*Pct` fields are percentages. Errors: `{ "error": { "code", "message" } }` (`INVALID_ADDRESS`, `VAULT_NOT_TRACKED`, `INVALID_PARAMETER`, `BLOCK_NOT_AVAILABLE`, `MARKET_NOT_FOUND`, `RPC_UNAVAILABLE`, `INTERNAL_ERROR`).
+Every response carries `block` and `asOf`. Amounts are decimal strings; `*Pct` fields are percentages. Errors: `{ "error": { "code", "message" } }` (`INVALID_ADDRESS`, `VAULT_NOT_TRACKED`, `INVALID_PARAMETER`, `BLOCK_NOT_AVAILABLE`, `RPC_UNAVAILABLE`, `INTERNAL_ERROR`).
 
 ```bash
 V=0xbeeff2490FEffa212faC2f6553682C219E6a8845
-curl -s localhost:3000/vaults | jq                              # tracked vaults
 curl -s localhost:3000/vaults/$V/report | jq                    # the report, latest block
 curl -s "localhost:3000/vaults/$V/report?block=53000000" | jq   # at a past block
 curl -s "localhost:3000/vaults/$V/peak?days=30" | jq            # peak share per assumption + coverage
-curl -s localhost:3000/markets/0x54cf9be57fdfa6457a660991907434ff9d295c465a603a50126ff647d50b7354/oracle | jq
 ```
 
 `/report` has `exposures` (per assumption: share, frozen-for, worst-case breakpoints, markets), `idle`, `noAssumption` (collateral priced as itself, e.g. WETH by ETH/USD) and `unknown` (markets with a `reasonCode`, plus `adapters` we could not read: money behind them counts as unknown, never idle); the four add up to 100%. If the RPC is down it answers 503.

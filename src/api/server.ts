@@ -1,16 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { getAddress, isAddress, zeroAddress } from 'viem';
-import { deriveAssumption } from '../analysis/assumptions.js';
-import { breakpoints } from '../analysis/breakpoints.js';
-import { frozenFor } from '../analysis/frozenFor.js';
-import { describeFrozenFor, durationHuman, buildReport } from '../analysis/report.js';
+import { getAddress, isAddress } from 'viem';
+import { buildReport } from '../analysis/report.js';
 import type { Registry } from '../analysis/registry.js';
 import { BlockNotFoundError, RevertedError, RpcUnavailableError } from '../chain/errors.js';
-import { readMarket } from '../chain/marketReader.js';
-import { decodeOracle } from '../chain/oracleDecoder.js';
-import { readToken, readVaultMeta } from '../chain/vaultReader.js';
 import type { Repo } from '../db/repo.js';
-import type { Address, ChainReader, DecodedOracle, Hex } from '../types.js';
+import type { Address, ChainReader } from '../types.js';
 
 export interface ServerDeps {
   reader: ChainReader;
@@ -26,11 +20,6 @@ export class ApiError extends Error {
     super(message);
   }
 }
-
-const WAD = 10n ** 18n;
-// A 1e18-scaled ratio as a percentage with 3 decimals (a percentage, not an amount).
-const wadToPct = (x: bigint) => Number((x * 100_000n + WAD / 2n) / WAD) / 1000; // rounded, not truncated
-const iso = (unixSeconds: number) => new Date(unixSeconds * 1000).toISOString();
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { reader, registry, repo } = deps;
@@ -58,28 +47,6 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!tracked.has(vault)) throw new ApiError(404, 'VAULT_NOT_TRACKED', `vault ${vault} is not in the tracked list`);
     return vault;
   }
-
-  async function head() {
-    const header = await reader.latest();
-    return { block: Number(header.number), asOf: iso(header.timestamp), number: header.number, timestamp: header.timestamp };
-  }
-
-  app.get('/vaults', async () => {
-    const { block, asOf, number } = await head();
-    const vaults = await Promise.all(
-      [...tracked].map(async (address) => {
-        const meta = await readVaultMeta(reader, address, number);
-        const snapshot = repo ? await repo.latestSnapshot(address) : null;
-        return {
-          address,
-          name: meta.name,
-          asset: { symbol: meta.asset.symbol, decimals: meta.asset.decimals },
-          lastSnapshotBlock: snapshot ? Number(snapshot.block) : null,
-        };
-      }),
-    );
-    return { block, asOf, vaults };
-  });
 
   app.get<{ Params: { address: string }; Querystring: { block?: string } }>('/vaults/:address/report', async (req) => {
     const vault = trackedVault(req.params.address);
@@ -124,66 +91,6 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         peakBlock: Number(p.peakBlock),
         peakAt: p.peakAt.toISOString(),
       })),
-    };
-  });
-
-  function oracleView(o: DecodedOracle): Record<string, unknown> {
-    switch (o.class) {
-      case 'fixed':
-        return { address: o.address, class: 'fixed' };
-      case 'unknown':
-        return { address: o.address, class: 'unknown', reasonCode: o.reasonCode, reason: o.reason };
-      case 'chainlink':
-        return {
-          address: o.address,
-          class: 'chainlink',
-          feeds: o.feeds.map((address) => {
-            const f = registry.feeds.get(address);
-            return { address, pair: f?.description ?? null, type: f?.type ?? null, deviationPct: f?.deviationPct ?? null, heartbeatSeconds: f?.heartbeatSeconds ?? null };
-          }),
-        };
-      case 'metaoracle':
-        return {
-          address: o.address,
-          class: 'metaoracle',
-          state: o.state,
-          primary: oracleView(o.primary),
-          backup: oracleView(o.backup),
-          deviationPct: wadToPct(o.deviation),
-          deviationThresholdPct: wadToPct(o.deviationThreshold),
-          challenge: { seconds: o.challengeSeconds, human: durationHuman(o.challengeSeconds), expiresAt: o.challengeExpiresAt ? iso(o.challengeExpiresAt) : null },
-          healing: { seconds: o.healingSeconds, human: durationHuman(o.healingSeconds), expiresAt: o.healingExpiresAt ? iso(o.healingExpiresAt) : null },
-        };
-    }
-  }
-
-  app.get<{ Params: { id: string } }>('/markets/:id/oracle', async (req) => {
-    const id = req.params.id;
-    if (!/^0x[0-9a-fA-F]{64}$/.test(id)) throw new ApiError(400, 'INVALID_PARAMETER', `"${id}" is not a market id (0x + 64 hex characters)`);
-    const { block, asOf, number, timestamp } = await head();
-    const market = await readMarket(reader, id.toLowerCase() as Hex, number);
-    if (!market || market.collateral === zeroAddress) {
-      throw new ApiError(404, 'MARKET_NOT_FOUND', `market ${id} does not exist or has no collateral (so no oracle)`);
-    }
-    const [collateral, loan, oracle] = await Promise.all([
-      readToken(reader, market.collateral, number),
-      readToken(reader, market.loan, number),
-      decodeOracle(reader, market.oracle, number),
-    ]);
-    const a = deriveAssumption(market.collateral, oracle, registry);
-    return {
-      marketId: market.id,
-      block,
-      asOf,
-      collateral: { address: market.collateral, symbol: collateral.symbol },
-      loan: { symbol: loan.symbol },
-      lltvPct: Number(market.lltv / 10n ** 14n) / 100,
-      assumptionId: a.kind === 'assumption' ? a.id : null,
-      assumption: a.kind === 'assumption' ? a.text : null,
-      ...(a.kind === 'unknown' ? { unknown: { reasonCode: a.reasonCode, reason: a.reason } } : {}),
-      oracle: oracleView(oracle),
-      frozenFor: describeFrozenFor(frozenFor(oracle, registry, timestamp)),
-      breakpoints: breakpoints(market.lltv),
     };
   });
 

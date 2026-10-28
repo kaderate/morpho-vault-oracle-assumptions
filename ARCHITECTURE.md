@@ -4,7 +4,7 @@
  RPC (Base) ──► Indexer ──────► Postgres ◄──── API (Fastify)
    (viem)      allocation       snapshots       /vaults/:a/report
       │        events →         markets         /vaults/:a/peak
-      │        snapshot at      checkpoints     /markets/:id/oracle
+      │        snapshot at      checkpoints
       │        that block
       └──► Chain readers ──► Oracle decoder ──► Analysis (pure)
            vault V2 → adapter   fixed | chainlink |   assumptions, breakpoints,
@@ -19,7 +19,7 @@
 - **Analysis** (pure functions): lender-side assumptions, the two breakpoints, the frozen-for window. No I/O, so it is unit-tested on fixtures.
 - **Indexer**: `getLogs` on the V2 vault and its V1 vault for allocation events, in chunks, up to `head − confirmationDepth`. For each event block, it takes a snapshot of the vault at that block. A checkpoint (last block + hash) allows resume; a parent-hash mismatch triggers a rollback of the last blocks.
 - **Postgres**: `checkpoints`, `markets` (collateral, oracle, LLTV, assumption), `snapshots` (vault, block, block hash, timestamp, total assets, the `/report` payload), `snapshot_positions` (snapshot, market, assets, MetaOracle state). Postgres because the data is relational (vault → market → oracle → assumption), amounts are exact big integers, and the peak is a plain SQL aggregate.
-- **API**: four read endpoints. Every response carries `block` and `asOf`; `unknown` markets are listed apart from the numbers.
+- **API**: two read endpoints (`report`, `peak`). Every response carries `block` and `asOf`; `unknown` markets are listed apart from the numbers.
 
 ## Failure paths
 - RPC errors and rate limits: retry with exponential backoff (viem), at most 3 requests in flight, `getLogs` in chunks of 10,000 blocks, resume from the checkpoint. A failed indexer pass is logged and retried on the next tick. A revert is told apart from an outage (`null` vs `RpcUnavailableError`), so an outage never looks like "no such getter".

@@ -53,4 +53,5 @@ Mine is vault-level, computed from the chain, and reproducible at a given block.
 ## With more time
 
 - **Alerts** (Telegram, webhooks). The data model (snapshots keyed by a stable `assumptionId`) already supports them. Missing: delivery, MetaOracle state tracking (its events or a periodic poll), cap and adapter events (not indexed today), and a changes feed. Worth alerting on: allocation shifts, MetaOracle challenges or switches, cap or adapter changes.
+- **Oracle detail per market**: the MetaOracle's current deviation against its threshold (how close a challenge is), challenge and healing expiry, and each feed's pair, deviation and heartbeat. The decoder already reads all of it; only the endpoint is missing.
 - Liquidity at risk per market, standalone V1 vaults, more chains.
